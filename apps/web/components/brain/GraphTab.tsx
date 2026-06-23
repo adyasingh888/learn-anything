@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { components, sharesSource } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 import { RelatedReadingPanel } from "./RelatedReadingPanel";
+import { ClaimEvidencePanel } from "./ClaimEvidencePanel";
+import { ConceptMapPanel } from "./ConceptMapPanel";
 
 export function GraphTab({ brainId }: { brainId: string }) {
-  const { atoms, concepts, edges, sources } = useBrain(brainId);
+  const { atoms, concepts, edges, sources, brain } = useBrain(brainId);
   const { addAtom, confirmEdge, rejectEdge, pruneSameSourceEdges } = useStore();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -69,6 +71,20 @@ export function GraphTab({ brainId }: { brainId: string }) {
           </div>
         )}
       </section>
+
+      {brain?.domainType === "research" && atoms.length >= 2 && (
+        <section>
+          <h3 className="text-sm font-semibold">Claim ↔ evidence map</h3>
+          <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+            Tag cross-source links as supports, contradicts, or related — builds your lit review graph.
+          </p>
+          <div className="mt-3">
+            <ClaimEvidencePanel brainId={brainId} />
+          </div>
+        </section>
+      )}
+
+      <ConceptMapPanel brainId={brainId} />
 
       {/* External reading — what user asked for */}
       <section>

@@ -19,6 +19,14 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | Related papers | **Semantic Scholar** + **OpenAlex** + **arXiv** (merged search) |
 | Web suggestions | **Jina Search** |
 | Spaced resurfacing | Home dashboard surfaces stale atoms & sources |
+| Claim ↔ evidence map | Research brains: tag cross-source supports/contradicts |
+| Concept map | Graph clusters from confirmed links |
+| Card-kind review | Learn tab: teach-back, free-recall, cloze, problem modes |
+| Mock exam + error drill | Exam studio: timed mode, drill missed questions |
+| Code drills | Procedural brains: in-browser JS sandbox + tests |
+| Language dictation | Listen & type (Web Speech API, no key) |
+| Mastery objectives | Auto from brain goal; tracked via mock exams |
+| Vault import | Settings → merge exported JSON |
 | PWA + extension | Install on phone; Chrome capture extension |
 
 ## Free external APIs we use (server-side, no user key)

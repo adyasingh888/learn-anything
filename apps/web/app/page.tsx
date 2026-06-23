@@ -46,6 +46,11 @@ function Dashboard() {
           {db.brains.map((b) => {
             const cards = db.cards.filter((c) => c.brainId === b.id);
             const due = dueCount(cards);
+            const mastery = db.mastery.filter((m) => m.brainId === b.id);
+            const masteryPct =
+              mastery.length > 0
+                ? Math.round((mastery.reduce((s, m) => s + m.mastery, 0) / mastery.length) * 100)
+                : null;
             const mode = getMode(b.modeId, b.domainType);
             const domain = getDomainInfo(b.domainType);
             return (
@@ -56,11 +61,16 @@ function Dashboard() {
               >
                 <div className="flex items-start justify-between">
                   <span className="text-2xl">{domain?.emoji ?? "🧠"}</span>
-                  {due > 0 && (
-                    <span className="rounded-full bg-[var(--color-accent)] px-2.5 py-0.5 text-xs font-bold text-white">
-                      {due} due
-                    </span>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {due > 0 && (
+                      <span className="rounded-full bg-[var(--color-accent)] px-2.5 py-0.5 text-xs font-bold text-white">
+                        {due} due
+                      </span>
+                    )}
+                    {masteryPct != null && (
+                      <span className="chip">{masteryPct}% mastery</span>
+                    )}
+                  </div>
                 </div>
                 <h3 className="mt-3 font-semibold text-[var(--color-text)]">{b.name}</h3>
                 <p className="mt-0.5 text-xs text-[var(--color-muted)]">{mode.name}</p>

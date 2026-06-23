@@ -259,6 +259,33 @@ function cardsFromChunk(chunk: string, opts: FlashcardOptions, budget: number): 
     }
   }
 
+  // Procedural / code drill from material with steps or numbers.
+  if (cards.length < budget && (/\bstep\b|\d+\.|function|algorithm|implement/i.test(chunk))) {
+    const prompt = sentences.find((s) => s.length > 40 && s.length < 220) ?? chunk.slice(0, 180);
+    cards.push(
+      makeCard({
+        ...opts,
+        kind: "problem",
+        bloom: "apply",
+        front: `Problem: ${prompt}\n\nWrite \`solution\` in JavaScript that solves this (see tests).`,
+        back: `TEST: typeof solution === "function"\nHINT: ${keyphrases[0] ?? "Re-read the source chunk"}`,
+      }),
+    );
+  }
+
+  // Free-recall capstone per chunk.
+  if (cards.length < budget && keyphrases[0]) {
+    cards.push(
+      makeCard({
+        ...opts,
+        kind: "free-recall",
+        bloom: "remember",
+        front: `From memory: list everything you know about **${keyphrases[0]}**.`,
+        back: sentences.slice(0, 3).join(" ") || chunk.slice(0, 250),
+      }),
+    );
+  }
+
   return cards;
 }
 

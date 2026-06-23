@@ -261,6 +261,14 @@ export function SourcesTab({ brainId, onGoGraph }: { brainId: string; onGoGraph?
                     {s.url}
                   </a>
                 )}
+                {s.kind === "audio" && typeof s.meta?.ref === "string" && (
+                  <audio controls src={s.meta.ref as string} className="mt-2 w-full max-w-md" />
+                )}
+                {s.kind === "audio" && (
+                  <p className="mt-1 text-xs text-[var(--color-muted)]">
+                    Paste a transcript as a note for atoms, cards, and tutor context.
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"

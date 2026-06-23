@@ -34,6 +34,7 @@ import {
   suggestEdges,
   updateMastery,
   upsertConcept,
+  objectivesFromGoal,
   type Activity,
   type Artifact,
   type Atom,
@@ -42,6 +43,7 @@ import {
   type Concept,
   type DomainType,
   type Edge,
+  type EdgeRelation,
   type MasteryState,
   type Objective,
   type Path,
@@ -97,6 +99,7 @@ interface StoreContext {
   enableEncryption: (passphrase: string) => Promise<void>;
   disableEncryption: () => void;
   exportVault: () => string;
+  importVault: (json: string, mode?: "merge" | "replace") => boolean;
   // brains
   createBrain: (name: string, domainType: DomainType, goal?: string) => Brain;
   updateBrain: (id: string, patch: Partial<Brain>) => void;
@@ -113,15 +116,20 @@ interface StoreContext {
   distillSourceToAtoms: (sourceId: string) => Promise<number>;
   confirmEdge: (id: string) => void;
   rejectEdge: (id: string) => void;
+  setEdgeRelation: (id: string, relation: EdgeRelation) => void;
+  addTypedEdge: (brainId: string, from: string, to: string, relation: EdgeRelation) => void;
   /** Remove same-source edge suggestions (legacy noise). */
   pruneSameSourceEdges: (brainId: string) => void;
   // generation
   generateCardsFromSource: (sourceId: string) => Promise<Card[]>;
+  setCardSuspended: (cardId: string, suspended: boolean) => void;
   // review
   gradeCard: (cardId: string, grade: ReviewGrade) => void;
   // activities / mastery
   logActivity: (a: Omit<Activity, "id" | "at"> & { at?: number }) => Activity;
   addArtifact: (a: Artifact) => void;
+  /** Backfill objectives for brains created before objective tracking. */
+  ensureObjectives: (brainId: string) => void;
 }
 
 const Ctx = createContext<StoreContext | null>(null);
@@ -233,6 +241,45 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const exportVault = useCallback(() => JSON.stringify(db, null, 2), [db]);
 
+  const importVault = useCallback(
+    (json: string, mode: "merge" | "replace" = "merge") => {
+      try {
+        const parsed = JSON.parse(json) as Partial<Database>;
+        if (!parsed.brains || !Array.isArray(parsed.brains)) return false;
+        commit((p) => {
+          if (mode === "replace") {
+            return { ...EMPTY_DB, ...parsed } as Database;
+          }
+          const mergeUnique = <T extends { id: string }>(a: T[], b: T[]) => {
+            const ids = new Set(a.map((x) => x.id));
+            return [...a, ...b.filter((x) => !ids.has(x.id))];
+          };
+          const mergeMastery = (a: MasteryState[], b: MasteryState[]) => {
+            const keys = new Set(a.map((x) => x.objectiveId));
+            return [...a, ...b.filter((x) => !keys.has(x.objectiveId))];
+          };
+          return {
+            brains: mergeUnique(p.brains, parsed.brains ?? []),
+            sources: mergeUnique(p.sources, parsed.sources ?? []),
+            atoms: mergeUnique(p.atoms, parsed.atoms ?? []),
+            concepts: mergeUnique(p.concepts, parsed.concepts ?? []),
+            edges: mergeUnique(p.edges, parsed.edges ?? []),
+            cards: mergeUnique(p.cards, parsed.cards ?? []),
+            activities: mergeUnique(p.activities, parsed.activities ?? []),
+            objectives: mergeUnique(p.objectives, parsed.objectives ?? []),
+            mastery: mergeMastery(p.mastery, parsed.mastery ?? []),
+            paths: mergeUnique(p.paths, parsed.paths ?? []),
+            artifacts: mergeUnique(p.artifacts, parsed.artifacts ?? []),
+          };
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [commit],
+  );
+
   // ---- Brains ----
   const createBrain = useCallback(
     (name: string, domainType: DomainType, goal?: string) => {
@@ -246,7 +293,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         createdAt: now(),
         updatedAt: now(),
       };
-      commit((p) => ({ ...p, brains: [...p.brains, brain] }));
+      const objectives = goal ? objectivesFromGoal(brain.id, goal) : [];
+      const mastery: MasteryState[] = objectives.map((o) => ({
+        objectiveId: o.id,
+        brainId: brain.id,
+        mastery: 0,
+        lastUpdated: now(),
+      }));
+      commit((p) => ({
+        ...p,
+        brains: [...p.brains, brain],
+        objectives: [...p.objectives, ...objectives],
+        mastery: [...p.mastery, ...mastery],
+      }));
       return brain;
     },
     [commit],
@@ -254,10 +313,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const updateBrain = useCallback(
     (id: string, patch: Partial<Brain>) =>
-      commit((p) => ({
-        ...p,
-        brains: p.brains.map((b) => (b.id === id ? { ...b, ...patch, updatedAt: now() } : b)),
-      })),
+      commit((p) => {
+        const prev = p.brains.find((b) => b.id === id);
+        let objectives = p.objectives;
+        let mastery = p.mastery;
+        if (patch.goal !== undefined && patch.goal !== prev?.goal && patch.goal?.trim()) {
+          objectives = [
+            ...p.objectives.filter((o) => o.brainId !== id),
+            ...objectivesFromGoal(id, patch.goal),
+          ];
+          const newObjs = objectives.filter((o) => o.brainId === id);
+          mastery = [
+            ...p.mastery.filter((m) => m.brainId !== id),
+            ...newObjs.map((o) => ({
+              objectiveId: o.id,
+              brainId: id,
+              mastery: 0,
+              lastUpdated: now(),
+            })),
+          ];
+        }
+        return {
+          ...p,
+          objectives,
+          mastery,
+          brains: p.brains.map((b) => (b.id === id ? { ...b, ...patch, updatedAt: now() } : b)),
+        };
+      }),
     [commit],
   );
 
@@ -272,6 +354,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         edges: p.edges.filter((e) => e.brainId !== id),
         cards: p.cards.filter((c) => c.brainId !== id),
         activities: p.activities.filter((a) => a.brainId !== id),
+        objectives: p.objectives.filter((o) => o.brainId !== id),
+        mastery: p.mastery.filter((m) => m.brainId !== id),
+        paths: p.paths.filter((path) => path.brainId !== id),
         artifacts: p.artifacts.filter((a) => a.brainId !== id),
       })),
     [commit],
@@ -361,6 +446,46 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
   const rejectEdge = useCallback(
     (id: string) => commit((p) => ({ ...p, edges: p.edges.filter((e) => e.id !== id) })),
+    [commit],
+  );
+
+  const setEdgeRelation = useCallback(
+    (id: string, relation: EdgeRelation) =>
+      commit((p) => ({
+        ...p,
+        edges: p.edges.map((e) => (e.id === id ? { ...e, relation, weight: 1 } : e)),
+      })),
+    [commit],
+  );
+
+  const addTypedEdge = useCallback(
+    (brainId: string, from: string, to: string, relation: EdgeRelation) =>
+      commit((p) => {
+        const exists = p.edges.some(
+          (e) =>
+            e.brainId === brainId &&
+            ((e.from === from && e.to === to) || (e.from === to && e.to === from)),
+        );
+        if (exists) return p;
+        const edge: Edge = {
+          id: newId("edge"),
+          brainId,
+          from,
+          to,
+          relation,
+          weight: 1,
+        };
+        return { ...p, edges: [...p.edges, edge] };
+      }),
+    [commit],
+  );
+
+  const setCardSuspended = useCallback(
+    (cardId: string, suspended: boolean) =>
+      commit((p) => ({
+        ...p,
+        cards: p.cards.map((c) => (c.id === cardId ? { ...c, suspended } : c)),
+      })),
     [commit],
   );
 
@@ -542,6 +667,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [commit],
   );
 
+  const ensureObjectives = useCallback(
+    (brainId: string) =>
+      commit((p) => {
+        const brain = p.brains.find((b) => b.id === brainId);
+        if (!brain?.goal?.trim()) return p;
+        if (p.objectives.some((o) => o.brainId === brainId)) return p;
+        const objectives = objectivesFromGoal(brainId, brain.goal);
+        const mastery: MasteryState[] = objectives.map((o) => ({
+          objectiveId: o.id,
+          brainId,
+          mastery: 0,
+          lastUpdated: now(),
+        }));
+        return {
+          ...p,
+          objectives: [...p.objectives, ...objectives],
+          mastery: [...p.mastery, ...mastery],
+        };
+      }),
+    [commit],
+  );
+
   const value = useMemo<StoreContext>(
     () => ({
       ready,
@@ -552,6 +699,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       enableEncryption,
       disableEncryption,
       exportVault,
+      importVault,
       createBrain,
       updateBrain,
       deleteBrain,
@@ -561,11 +709,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       distillSourceToAtoms,
       confirmEdge,
       rejectEdge,
+      setEdgeRelation,
+      addTypedEdge,
       pruneSameSourceEdges,
       generateCardsFromSource,
+      setCardSuspended,
       gradeCard,
       logActivity,
       addArtifact,
+      ensureObjectives,
     }),
     [
       ready,
@@ -576,6 +728,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       enableEncryption,
       disableEncryption,
       exportVault,
+      importVault,
       createBrain,
       updateBrain,
       deleteBrain,
@@ -585,11 +738,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       distillSourceToAtoms,
       confirmEdge,
       rejectEdge,
+      setEdgeRelation,
+      addTypedEdge,
       pruneSameSourceEdges,
       generateCardsFromSource,
+      setCardSuspended,
       gradeCard,
       logActivity,
       addArtifact,
+      ensureObjectives,
     ],
   );
 
@@ -608,7 +765,9 @@ export function useBrain(brainId: string) {
     const cards = db.cards.filter((c) => c.brainId === brainId);
     const activities = db.activities.filter((a) => a.brainId === brainId);
     const artifacts = db.artifacts.filter((a) => a.brainId === brainId);
-    return { brain, sources, atoms, concepts, edges, cards, activities, artifacts };
+    const objectives = db.objectives.filter((o) => o.brainId === brainId);
+    const mastery = db.mastery.filter((m) => m.brainId === brainId);
+    return { brain, sources, atoms, concepts, edges, cards, activities, artifacts, objectives, mastery };
   }, [db, brainId]);
 }
 

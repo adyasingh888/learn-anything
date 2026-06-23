@@ -13,10 +13,14 @@ export * from "./ingest/bibtex.js";
 export * from "./ingest/identifiers.js";
 export * from "./graph/index.js";
 export * from "./graph/related-reading.js";
+export * from "./graph/concept-map.js";
 export * from "./resurface/index.js";
 export * from "./rag/index.js";
 export * from "./generation/index.js";
 export * from "./session/index.js";
+export * from "./session/objectives.js";
+export * from "./research/claims.js";
+export * from "./drill/code-tests.js";
 
 export * from "./modes/types.js";
 export * from "./modes/registry.js";

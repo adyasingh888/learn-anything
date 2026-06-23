@@ -1,10 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { allModes, getMode } from "@learn-anything/core";
+import { isMastered, MASTERY_THRESHOLD } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 
 export function BrainSettings({ brainId }: { brainId: string }) {
-  const { brain } = useBrain(brainId);
+  const { brain, objectives, mastery } = useBrain(brainId);
   const { updateBrain, deleteBrain } = useStore();
   const router = useRouter();
   if (!brain) return null;
@@ -31,6 +32,32 @@ export function BrainSettings({ brainId }: { brainId: string }) {
           onChange={(e) => updateBrain(brainId, { deadline: e.target.value })}
         />
       </div>
+
+      {objectives.length > 0 && (
+        <div className="card-surface rounded-2xl p-4">
+          <h3 className="text-sm font-semibold">Objectives & mastery</h3>
+          <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+            Auto-derived from your goal. Mock exams and drills update mastery (target {MASTERY_THRESHOLD * 100}%).
+          </p>
+          <ul className="mt-3 space-y-2">
+            {objectives.map((o) => {
+              const m = mastery.find((x) => x.objectiveId === o.id);
+              const pct = Math.round((m?.mastery ?? 0) * 100);
+              return (
+                <li key={o.id} className="rounded-lg border p-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span>{o.title}</span>
+                    <span className={isMastered(m) ? "text-emerald-600" : "text-[var(--color-muted)]"}>{pct}%</span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--color-line)]">
+                    <div className="h-full bg-[var(--color-accent)]" style={{ width: `${pct}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       <div className="card-surface rounded-2xl p-4">
         <h3 className="text-sm font-semibold">Learning mode</h3>

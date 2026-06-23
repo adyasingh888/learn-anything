@@ -84,7 +84,8 @@ function Privacy() {
 }
 
 function DataSection() {
-  const { exportVault } = useStore();
+  const { exportVault, importVault } = useStore();
+  const [msg, setMsg] = useState<string | null>(null);
   const download = () => {
     const blob = new Blob([exportVault()], { type: "application/json" });
     const a = document.createElement("a");
@@ -92,15 +93,31 @@ function DataSection() {
     a.download = `learn-anything-export-${Date.now()}.json`;
     a.click();
   };
+  const onImport = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const ok = importVault(await file.text(), "merge");
+      setMsg(ok ? "Vault merged successfully." : "Invalid vault file.");
+    } catch {
+      setMsg("Could not read file.");
+    }
+  };
   return (
     <section className="card-surface mt-5 rounded-2xl p-4">
       <h2 className="text-sm font-semibold">Your data</h2>
       <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-        Everything lives on this device. Export a portable copy any time.
+        Everything lives on this device. Export or merge a portable copy any time.
       </p>
-      <button className="btn mt-3" onClick={download}>
-        ⬇ Export vault (JSON)
-      </button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn" onClick={download}>
+          ⬇ Export vault (JSON)
+        </button>
+        <label className="btn cursor-pointer">
+          ⬆ Import / merge vault
+          <input type="file" accept="application/json,.json" hidden onChange={(e) => onImport(e.target.files?.[0])} />
+        </label>
+      </div>
+      {msg && <p className="mt-2 text-xs text-[var(--color-accent-2)]">{msg}</p>}
     </section>
   );
 }

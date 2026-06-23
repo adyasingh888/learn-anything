@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { getDomainInfo, getMode } from "@learn-anything/core";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
-import { dueCount, useBrain } from "@/lib/store";
+import { dueCount, useBrain, useStore } from "@/lib/store";
 import { SourcesTab } from "./SourcesTab";
 import { GraphTab } from "./GraphTab";
 import { LearnTab } from "./LearnTab";
@@ -25,7 +25,8 @@ export function BrainView({ brainId }: { brainId: string }) {
 }
 
 function Inner({ brainId }: { brainId: string }) {
-  const { brain, cards } = useBrain(brainId);
+  const { brain, cards, objectives, mastery } = useBrain(brainId);
+  const { ensureObjectives } = useStore();
   const searchParams = useSearchParams();
   const router = useRouter();
   const tabParam = searchParams.get("tab") as Tab | null;
@@ -34,6 +35,10 @@ function Inner({ brainId }: { brainId: string }) {
   useEffect(() => {
     if (tabParam && isTab(tabParam)) setTab(tabParam);
   }, [tabParam]);
+
+  useEffect(() => {
+    if (brain?.goal) ensureObjectives(brainId);
+  }, [brainId, brain?.goal, ensureObjectives]);
 
   const goTab = (t: Tab) => {
     setTab(t);
@@ -54,6 +59,10 @@ function Inner({ brainId }: { brainId: string }) {
   const mode = getMode(brain.modeId, brain.domainType);
   const domain = getDomainInfo(brain.domainType);
   const due = dueCount(cards);
+  const avgMastery =
+    mastery.length > 0
+      ? Math.round((mastery.reduce((s, m) => s + m.mastery, 0) / mastery.length) * 100)
+      : null;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "sources", label: "Sources" },
@@ -77,6 +86,11 @@ function Inner({ brainId }: { brainId: string }) {
       </div>
       {brain.goal && (
         <p className="mt-2 text-sm text-[var(--color-muted)]">🎯 {brain.goal}</p>
+      )}
+      {avgMastery != null && objectives.length > 0 && (
+        <p className="mt-1 text-xs text-[var(--color-accent)]">
+          Mastery: {avgMastery}% across {objectives.length} objective{objectives.length === 1 ? "" : "s"}
+        </p>
       )}
 
       <nav className="mt-5 flex gap-1 overflow-x-auto border-b pb-px">
@@ -120,6 +134,8 @@ function studioLabel(domain: string): string {
       return "Studio";
     case "exam":
       return "Mock Exam";
+    case "procedural":
+      return "Drill";
     case "research":
       return "Synthesis";
     default:
