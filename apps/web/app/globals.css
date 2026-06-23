@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0d12;
+  --color-panel: #12151d;
+  --color-panel-2: #181c26;
+  --color-line: #262b38;
+  --color-accent: #7c6cff;
+  --color-accent-2: #22d3a6;
+  --color-muted: #8a92a6;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: #e7e9ef;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.card-surface {
+  background: linear-gradient(180deg, var(--color-panel-2), var(--color-panel));
+  border: 1px solid var(--color-line);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.85rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+  border: 1px solid var(--color-line);
+}
+.btn:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-line));
+}
+.btn-primary {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 92%, white), var(--color-accent));
+  color: white;
+  border: none;
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+.input {
+  background: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  width: 100%;
+  font-size: 0.9rem;
+}
+.input:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  outline-offset: 0;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: var(--color-panel-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-muted);
+}

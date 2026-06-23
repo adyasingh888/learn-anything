@@ -1,0 +1,19 @@
+{
+  "name": "learn-anything",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A privacy-first second brain that teaches you.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:core": "npm run build -w @learn-anything/core",
+    "dev": "npm run dev -w @learn-anything/web",
+    "build": "npm run build:core && npm run build -w @learn-anything/web",
+    "lint": "echo \"(lint configured per-package)\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

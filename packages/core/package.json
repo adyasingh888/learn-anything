@@ -1,0 +1,29 @@
+{
+  "name": "@learn-anything/core",
+  "version": "0.1.0",
+  "description": "Domain model, learning-modes engine, FSRS-6 scheduler, knowledge graph, RAG and content-generation contracts for Learn Anything.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./src/*": "./src/*"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "ts-fsrs": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

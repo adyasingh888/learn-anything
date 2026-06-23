@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { width: 280px; margin: 0; font-family: system-ui, sans-serif; background: #0b0d12; color: #e7e9ef; }
+      .wrap { padding: 14px; }
+      h1 { font-size: 14px; margin: 0 0 8px; }
+      .meta { font-size: 11px; color: #8a92a6; word-break: break-all; margin-bottom: 10px; }
+      input { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 8px; border: 1px solid #262b38; background: #12151d; color: #e7e9ef; font-size: 12px; margin-bottom: 8px; }
+      button { width: 100%; padding: 9px; border: none; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; background: linear-gradient(180deg,#8b7cff,#7c6cff); color: #fff; }
+      .hint { font-size: 11px; color: #8a92a6; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Save to Learn Anything</h1>
+      <div class="meta" id="meta">Loading…</div>
+      <input id="appUrl" placeholder="App URL" value="http://localhost:3000" />
+      <button id="save">Capture this page</button>
+      <div class="hint">Opens your library to pick a Brain. Your data stays in the app.</div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
