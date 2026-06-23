@@ -35,6 +35,7 @@ import {
   updateMastery,
   upsertConcept,
   objectivesFromGoal,
+  brainToMarkdown,
   pathFromObjectives,
   type Activity,
   type Artifact,
@@ -102,6 +103,7 @@ interface StoreContext {
   exportVault: () => string;
   importVault: (json: string, mode?: "merge" | "replace") => boolean;
   exportBrain: (brainId: string) => string;
+  exportBrainMarkdown: (brainId: string) => string;
   enrichSourceText: (sourceId: string) => Promise<boolean>;
   // brains
   createBrain: (name: string, domainType: DomainType, goal?: string) => Brain;
@@ -262,6 +264,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       };
       return JSON.stringify(slice, null, 2);
     },
+    [db],
+  );
+
+  const exportBrainMarkdown = useCallback(
+    (brainId: string) =>
+      brainToMarkdown({
+        brain: db.brains.find((b) => b.id === brainId),
+        sources: db.sources.filter((s) => s.brainId === brainId),
+        atoms: db.atoms.filter((a) => a.brainId === brainId),
+        edges: db.edges.filter((e) => e.brainId === brainId),
+        cards: db.cards.filter((c) => c.brainId === brainId),
+        objectives: db.objectives.filter((o) => o.brainId === brainId),
+      }),
     [db],
   );
 
@@ -771,6 +786,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       exportVault,
       importVault,
       exportBrain,
+      exportBrainMarkdown,
       enrichSourceText,
       createBrain,
       updateBrain,
@@ -802,6 +818,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       exportVault,
       importVault,
       exportBrain,
+      exportBrainMarkdown,
       enrichSourceText,
       createBrain,
       updateBrain,

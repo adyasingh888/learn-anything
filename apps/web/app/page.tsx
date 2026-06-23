@@ -6,6 +6,7 @@ import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
 import { NewBrainModal } from "@/components/NewBrainModal";
 import { ResurfacePanel } from "@/components/ResurfacePanel";
+import { FeatureTips } from "@/components/FeatureTips";
 import { dueCount, useStore } from "@/lib/store";
 
 export default function HomePage() {
@@ -85,6 +86,7 @@ function Dashboard() {
       )}
 
       <ResurfacePanel />
+      <FeatureTips />
     </div>
   );
 }

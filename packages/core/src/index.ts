@@ -23,6 +23,8 @@ export * from "./session/pacing.js";
 export * from "./session/paths.js";
 export * from "./search/vault.js";
 export * from "./generation/socratic.js";
+export * from "./export/markdown.js";
+export * from "./memory/mnemonics.js";
 export * from "./research/claims.js";
 export * from "./drill/code-tests.js";
 

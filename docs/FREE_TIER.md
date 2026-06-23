@@ -33,7 +33,9 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | Socratic tutor | Offline question loop for concept/research brains |
 | Creative studio | Exemplar → draft → rubric for creative domain |
 | Curriculum path | Objectives sequenced with deadline pacing |
-| Per-brain export | Settings → export single brain JSON |
+| Per-brain export | Settings → JSON or Markdown download |
+| Memory palace | Memory brains → palace rooms + mnemonics |
+| Project milestones | Project brains → pacing + weekly reflection |
 | PWA + extension | Install on phone; Chrome capture extension |
 
 ## Free external APIs we use (server-side, no user key)

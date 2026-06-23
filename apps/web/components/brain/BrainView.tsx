@@ -157,6 +157,10 @@ function studioLabel(domain: string): string {
       return "Drill";
     case "creative":
       return "Create";
+    case "memory":
+      return "Memory";
+    case "project":
+      return "Project";
     case "research":
       return "Synthesis";
     default:

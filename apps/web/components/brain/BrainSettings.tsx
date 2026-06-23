@@ -6,7 +6,7 @@ import { useBrain, useStore } from "@/lib/store";
 
 export function BrainSettings({ brainId }: { brainId: string }) {
   const { brain, objectives, mastery, paths } = useBrain(brainId);
-  const { updateBrain, deleteBrain, exportBrain } = useStore();
+  const { updateBrain, deleteBrain, exportBrain, exportBrainMarkdown } = useStore();
   const router = useRouter();
   if (!brain) return null;
 
@@ -86,20 +86,35 @@ export function BrainSettings({ brainId }: { brainId: string }) {
 
       <div className="card-surface rounded-2xl p-4">
         <h3 className="text-sm font-semibold">Export brain</h3>
-        <p className="mt-0.5 text-xs text-[var(--color-muted)]">Portable JSON for this topic only.</p>
-        <button
-          type="button"
-          className="btn mt-3"
-          onClick={() => {
-            const blob = new Blob([exportBrain(brainId)], { type: "application/json" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = `${brain.name.replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.json`;
-            a.click();
-          }}
-        >
-          ⬇ Export this brain
-        </button>
+        <p className="mt-0.5 text-xs text-[var(--color-muted)]">Portable JSON or Markdown for this topic.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              const blob = new Blob([exportBrain(brainId)], { type: "application/json" });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `${brain.name.replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.json`;
+              a.click();
+            }}
+          >
+            ⬇ JSON
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              const blob = new Blob([exportBrainMarkdown(brainId)], { type: "text/markdown" });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `${brain.name.replace(/\s+/g, "-").toLowerCase()}.md`;
+              a.click();
+            }}
+          >
+            ⬇ Markdown
+          </button>
+        </div>
       </div>
 
       <div className="card-surface rounded-2xl p-4">
