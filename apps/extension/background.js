@@ -8,7 +8,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  const { appUrl = "http://localhost:3000" } = await chrome.storage.local.get(["appUrl"]);
+  const { appUrl = "https://learn-anything-silk.vercel.app" } = await chrome.storage.local.get(["appUrl"]);
   const params = new URLSearchParams({
     url: info.linkUrl || info.pageUrl || tab?.url || "",
     title: tab?.title || "",

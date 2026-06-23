@@ -2,7 +2,9 @@
 
 A privacy-first **second brain that teaches you**. Capture links, notes, and files into topic **Brains**, auto-connect them into a knowledge graph, and learn through a pedagogy engine that adapts to what you're studying (language, research, instruments, exams, and more).
 
-**Live app:** deployed on Vercel (see repo homepage or latest deployment URL).
+**Live app:** [https://learn-anything-silk.vercel.app](https://learn-anything-silk.vercel.app)
+
+**GitHub:** [https://github.com/adyasingh888/learn-anything](https://github.com/adyasingh888/learn-anything)
 
 ## Features
 
@@ -26,7 +28,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Open `chrome://extensions` → Developer mode → **Load unpacked**
 2. Select `apps/extension`
-3. Set the app URL to your deployed site (or `http://localhost:3000` for local dev)
+3. Set the app URL to [https://learn-anything-silk.vercel.app](https://learn-anything-silk.vercel.app) (pre-filled by default)
 
 ## Monorepo layout
 
