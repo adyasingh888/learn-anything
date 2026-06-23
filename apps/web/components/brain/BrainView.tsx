@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { getDomainInfo, getMode, computePacing, nextObjective, isMastered } from "@learn-anything/core";
+import { getDomainInfo, getMode, computePacing, nextObjective, isMastered, computeModeMetrics } from "@learn-anything/core";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
 import { dueCount, useBrain, useStore } from "@/lib/store";
@@ -26,7 +26,7 @@ export function BrainView({ brainId }: { brainId: string }) {
 }
 
 function Inner({ brainId }: { brainId: string }) {
-  const { brain, cards, objectives, mastery } = useBrain(brainId);
+  const { brain, cards, objectives, mastery, activities } = useBrain(brainId);
   const { ensureObjectives } = useStore();
   const masteryMap = useMemo(() => new Map(mastery.map((m) => [m.objectiveId, m])), [mastery]);
   const currentObjective = useMemo(
@@ -50,6 +50,15 @@ function Inner({ brainId }: { brainId: string }) {
     if (brain?.goal) ensureObjectives(brainId);
   }, [brainId, brain?.goal, ensureObjectives]);
 
+  const mode = useMemo(
+    () => getMode(brain?.modeId, brain?.domainType ?? "general"),
+    [brain?.modeId, brain?.domainType],
+  );
+  const metrics = useMemo(
+    () => computeModeMetrics(mode, activities, cards, mastery),
+    [mode, activities, cards, mastery],
+  );
+
   const goTab = (t: Tab) => {
     setTab(t);
     router.replace(`/brain/${brainId}?tab=${t}`, { scroll: false });
@@ -66,7 +75,6 @@ function Inner({ brainId }: { brainId: string }) {
     );
   }
 
-  const mode = getMode(brain.modeId, brain.domainType);
   const domain = getDomainInfo(brain.domainType);
   const due = dueCount(cards);
   const avgMastery =
@@ -112,6 +120,15 @@ function Inner({ brainId }: { brainId: string }) {
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
           Up next: {currentObjective.title}
         </p>
+      )}
+      {Object.keys(metrics).length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {Object.entries(metrics).slice(0, 4).map(([k, v]) => (
+            <span key={k} className="chip text-xs">
+              {k}: {v < 2 ? `${Math.round(v * 100)}%` : Math.round(v)}
+            </span>
+          ))}
+        </div>
       )}
 
       <nav className="mt-5 flex gap-1 overflow-x-auto border-b pb-px">

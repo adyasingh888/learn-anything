@@ -40,7 +40,15 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | Project milestones | Project brains → pacing + weekly reflection + activity log |
 | Brain import | Settings or brain Settings → JSON pack |
 | Review reminders | Settings → browser notifications when cards due |
-| Semantic search | ⌘K merges keyword + on-device embeddings |
+| Mode engine | Generators, feedback plugins, quality gates per learning mode |
+| Capture & Digest studio | Distill pipeline, resurface queue, summarize stage |
+| Concept Mastery studio | Concept map drill, Socratic, recall, metrics dashboard |
+| Language conversation | Dialogue turns + pronunciation scoring |
+| Practice studio depth | Reference track, recording analysis, practice history |
+| Exam blueprint | Mastery-weighted mock exams + persistent error log |
+| Curriculum gating | Learn sessions filtered to current objective |
+| Share links | Read-only `/view?pack=…` URLs (Pro tier demo) |
+| Account & plans | Device-local identity; free/pro/team feature gates |
 | PWA + extension | Install on phone; Chrome capture extension |
 
 ## Free external APIs we use (server-side, no user key)

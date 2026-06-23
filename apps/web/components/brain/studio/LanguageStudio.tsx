@@ -1,10 +1,10 @@
 "use client";
 import { useMemo, useState } from "react";
-import { mineVocab } from "@learn-anything/core";
+import { dialogueFollowUp, generateDialogueTurn, mineVocab, scorePronunciation } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 import { useRecorder } from "../StudioTab";
 
-type Mode = "speak" | "listen" | "vocab";
+type Mode = "speak" | "listen" | "vocab" | "conversation";
 
 export function LanguageStudio({ brainId }: { brainId: string }) {
   const { cards, atoms, sources } = useBrain(brainId);
@@ -16,6 +16,11 @@ export function LanguageStudio({ brainId }: { brainId: string }) {
   const [typed, setTyped] = useState("");
   const [checked, setChecked] = useState<boolean | null>(null);
   const [mining, setMining] = useState(false);
+  const [dialogue, setDialogue] = useState("");
+  const [reply, setReply] = useState("");
+  const [pronScore, setPronScore] = useState<number | null>(null);
+
+  const contextText = useMemo(() => sources.map((s) => s.text).join("\n").slice(0, 4000), [sources]);
 
   const vocab = useMemo(() => mineVocab(sources, 16), [sources]);
 
@@ -42,9 +47,11 @@ export function LanguageStudio({ brainId }: { brainId: string }) {
 
   const checkDictation = () => {
     const score = overlap(typed, phrase);
-    const ok = score >= 0.55;
+    const pron = scorePronunciation(typed, phrase);
+    const blended = (score + pron.score) / 2;
+    const ok = blended >= 0.55;
     setChecked(ok);
-    logActivity({ brainId, kind: "listen", score, payload: { mode: "dictation" } });
+    logActivity({ brainId, kind: "listen", score: blended, payload: { mode: "dictation" } });
   };
 
   const next = () => {
@@ -74,9 +81,29 @@ export function LanguageStudio({ brainId }: { brainId: string }) {
         <button type="button" className={`btn text-sm ${mode === "vocab" ? "btn-primary" : ""}`} onClick={() => setMode("vocab")}>
           Vocab ({vocab.length})
         </button>
+        <button type="button" className={`btn text-sm ${mode === "conversation" ? "btn-primary" : ""}`} onClick={() => { setMode("conversation"); setDialogue(generateDialogueTurn(contextText)); }}>
+          Conversation
+        </button>
       </div>
 
-      {mode === "vocab" ? (
+      {mode === "conversation" ? (
+        <div className="card-surface rounded-2xl p-4 space-y-3">
+          <p className="text-sm whitespace-pre-wrap">{dialogue}</p>
+          <textarea className="input min-h-[80px]" placeholder="Your response…" value={reply} onChange={(e) => setReply(e.target.value)} />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-primary" disabled={!reply.trim()} onClick={() => {
+              const follow = dialogueFollowUp(reply, contextText);
+              setDialogue(follow);
+              const p = scorePronunciation(reply, phrase);
+              setPronScore(p.score);
+              logActivity({ brainId, kind: "speak", score: p.score, payload: { conversation: true } });
+              setReply("");
+            }}>Send</button>
+            <button type="button" className="btn" onClick={() => setDialogue(generateDialogueTurn(contextText))}>New topic</button>
+          </div>
+          {pronScore != null && <p className="text-xs text-[var(--color-accent)]">Overlap score: {Math.round(pronScore * 100)}%</p>}
+        </div>
+      ) : mode === "vocab" ? (
         <div className="card-surface rounded-2xl p-4">
           <h4 className="text-sm font-semibold">Mined vocabulary</h4>
           <p className="mt-1 text-xs text-[var(--color-muted)]">From your sources — turn into cloze cards for Learn.</p>

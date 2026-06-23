@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { MASTERY_THRESHOLD, type Card } from "@learn-anything/core";
+import { MASTERY_THRESHOLD, buildExamBlueprint, buildMockExam, getErrorLog, nextObjective, type Card } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 
 interface Answer {
@@ -10,7 +10,7 @@ interface Answer {
 }
 
 export function ExamStudio({ brainId }: { brainId: string }) {
-  const { cards, objectives } = useBrain(brainId);
+  const { cards, objectives, activities, mastery } = useBrain(brainId);
   const { logActivity, setCardSuspended } = useStore();
   const [running, setRunning] = useState(false);
   const [timed, setTimed] = useState(false);
@@ -22,10 +22,16 @@ export function ExamStudio({ brainId }: { brainId: string }) {
   const [drillMode, setDrillMode] = useState(false);
 
   const pool = useMemo(() => cards.filter((c) => c.kind === "qa" || c.kind === "cloze" || c.kind === "free-recall"), [cards]);
-  const applyObjective = objectives[objectives.length - 1]?.id;
+  const blueprint = useMemo(() => buildExamBlueprint(cards, objectives), [cards, objectives]);
+  const errorLog = useMemo(() => getErrorLog(activities, cards, brainId), [activities, cards, brainId]);
+  const masteryMap = useMemo(() => new Map(mastery.map((m) => [m.objectiveId, m])), [mastery]);
+  const applyObjective = nextObjective(objectives, masteryMap)?.id;
 
   const start = (onlyWrong?: Card[]) => {
-    const base = onlyWrong ?? [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
+    const weakIds = errorLog.map((e) => e.cardId);
+    const base =
+      onlyWrong ??
+      buildMockExam(pool, { count: Math.min(10, pool.length), weakCardIds: weakIds, weightWeak: true });
     setAnswers(base.map((card) => ({ card, response: "", correct: null })));
     setIdx(0);
     setResponse("");
@@ -134,8 +140,11 @@ export function ExamStudio({ brainId }: { brainId: string }) {
         <div className="text-3xl">📝</div>
         <h3 className="mt-2 text-lg font-semibold">Mock exam</h3>
         <p className="mt-1 text-sm text-[var(--color-muted)]">
-          {Math.min(10, pool.length)} questions from your {pool.length} cards.
+          {Math.min(10, pool.length)} questions from {blueprint.total} card pool.
         </p>
+        {errorLog.length > 0 && (
+          <p className="mt-2 text-xs text-amber-600">{errorLog.length} recurring errors in log</p>
+        )}
         <label className="mt-4 flex items-center justify-center gap-2 text-sm">
           <input type="checkbox" checked={timed} onChange={(e) => setTimed(e.target.checked)} />
           Timed mode (~90s per question)

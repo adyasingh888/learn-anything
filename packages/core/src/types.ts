@@ -26,6 +26,9 @@ export interface PrivacyPolicy {
   aiProcessing: "device" | "cloud";
   /** Whether captured raw content may be sent to a cloud LLM (with consent) for generation. */
   allowCloudGeneration: boolean;
+  /** Sharing posture for multi-user flows. */
+  shareLevel?: "private" | "link" | "team";
+  redactSourceText?: boolean;
 }
 
 export const DEFAULT_PRIVACY_POLICY: PrivacyPolicy = {
@@ -187,6 +190,9 @@ export interface Objective {
   description?: string;
   bloomTarget: BloomLevel;
   prerequisiteIds: ID[];
+  /** Optional links for curriculum gating. */
+  conceptIds?: ID[];
+  cardIds?: ID[];
 }
 
 export interface MasteryState {

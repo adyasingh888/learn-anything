@@ -11,10 +11,38 @@ import { ExamStudio } from "./studio/ExamStudio";
 import { ResearchStudio } from "./studio/ResearchStudio";
 import { TeachBackStudio } from "./studio/TeachBackStudio";
 import { FreeRecallStudio } from "./studio/FreeRecallStudio";
+import { CaptureDigestStudio } from "./studio/CaptureDigestStudio";
+import { ConceptMasteryStudio } from "./studio/ConceptMasteryStudio";
+import { getMode } from "@learn-anything/core";
 
 export function StudioTab({ brainId }: { brainId: string }) {
   const { brain } = useBrain(brainId);
   if (!brain) return null;
+
+  const mode = getMode(brain.modeId, brain.domainType);
+  switch (mode.id) {
+    case "capture-digest":
+      return <CaptureDigestStudio brainId={brainId} />;
+    case "concept-mastery":
+      return <ConceptMasteryStudio brainId={brainId} />;
+    case "language-immersion":
+      return <LanguageStudio brainId={brainId} />;
+    case "practice-studio":
+      return <PerformanceStudio brainId={brainId} />;
+    case "exam-prep":
+      return <ExamStudio brainId={brainId} />;
+    case "research-scholar":
+      return <ResearchStudio brainId={brainId} />;
+    case "practice-drill":
+      return <CodeDrillStudio brainId={brainId} />;
+    case "studio-critique":
+      return <CreativeStudio brainId={brainId} />;
+    case "memory":
+      return <MemoryStudio brainId={brainId} />;
+    case "project-apprenticeship":
+      return <ProjectStudio brainId={brainId} />;
+  }
+
   switch (brain.domainType) {
     case "performance":
       return <PerformanceStudio brainId={brainId} />;

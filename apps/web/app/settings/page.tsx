@@ -1,9 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
 import { ReviewReminderToggle } from "@/components/ReviewReminders";
+import { ensureAccount, getAccount, updateAccount } from "@/lib/auth";
+import { PLAN_LABELS } from "@/lib/billing";
 import { useStore } from "@/lib/store";
 
 export default function SettingsPage() {
@@ -24,6 +26,7 @@ export default function SettingsPage() {
         <Privacy />
         <DataSection />
         <BrainImportSection />
+        <AccountSection />
       </main>
     </Gate>
   );
@@ -155,6 +158,42 @@ function BrainImportSection() {
         <input type="file" accept="application/json,.json" hidden onChange={(e) => onImport(e.target.files?.[0])} />
       </label>
       {msg && <p className="mt-2 text-xs text-[var(--color-accent-2)]">{msg}</p>}
+    </section>
+  );
+}
+
+function AccountSection() {
+  const [name, setName] = useState("");
+  const [plan, setPlan] = useState<"free" | "pro" | "team">("free");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const a = getAccount() ?? ensureAccount();
+    setName(a.displayName);
+    setPlan(a.plan);
+  }, []);
+
+  const save = () => {
+    updateAccount({ displayName: name, plan });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <section className="card-surface mt-5 rounded-2xl p-4">
+      <h2 className="text-sm font-semibold">Account & plan</h2>
+      <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+        Local identity for sharing, sync, and billing gates. Current plan: {PLAN_LABELS[plan]}.
+      </p>
+      <input className="input mt-3" value={name} onChange={(e) => setName(e.target.value)} placeholder="Display name" />
+      <select className="input mt-2" value={plan} onChange={(e) => setPlan(e.target.value as "free" | "pro" | "team")}>
+        <option value="free">Free</option>
+        <option value="pro">Pro (demo)</option>
+        <option value="team">Team (demo)</option>
+      </select>
+      <button type="button" className="btn btn-primary mt-3" onClick={save}>
+        {saved ? "Saved ✓" : "Save account"}
+      </button>
     </section>
   );
 }

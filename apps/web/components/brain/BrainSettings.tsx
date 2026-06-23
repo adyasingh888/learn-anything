@@ -1,12 +1,15 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { allModes, getMode, isMastered, MASTERY_THRESHOLD, nextObjective } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
+import { ShareBrainModal } from "./ShareBrainModal";
 
 export function BrainSettings({ brainId }: { brainId: string }) {
   const { brain, objectives, mastery, paths } = useBrain(brainId);
   const { updateBrain, deleteBrain, exportBrain, exportBrainMarkdown, importBrain } = useStore();
   const router = useRouter();
+  const [sharing, setSharing] = useState(false);
   if (!brain) return null;
 
   const mode = getMode(brain.modeId, brain.domainType);
@@ -117,6 +120,14 @@ export function BrainSettings({ brainId }: { brainId: string }) {
       </div>
 
       <div className="card-surface rounded-2xl p-4">
+        <h3 className="text-sm font-semibold">Share</h3>
+        <p className="mt-0.5 text-xs text-[var(--color-muted)]">Create a read-only link — encoded in URL, no server.</p>
+        <button type="button" className="btn btn-primary mt-3" onClick={() => setSharing(true)}>
+          Share brain
+        </button>
+      </div>
+
+      <div className="card-surface rounded-2xl p-4">
         <h3 className="text-sm font-semibold">Import brain pack</h3>
         <p className="mt-0.5 text-xs text-[var(--color-muted)]">Import a JSON export from another device as a new brain.</p>
         <label className="btn mt-3 cursor-pointer">
@@ -207,6 +218,8 @@ export function BrainSettings({ brainId }: { brainId: string }) {
           Delete brain
         </button>
       </div>
+
+      {sharing && <ShareBrainModal brainId={brainId} onClose={() => setSharing(false)} />}
     </div>
   );
 }

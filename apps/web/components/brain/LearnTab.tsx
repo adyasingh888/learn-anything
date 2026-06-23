@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import {
-  buildSession,
+  buildModeSession,
   buildWeaknessSession,
   createScheduler,
   getMode,
@@ -48,7 +48,7 @@ export function LearnTab({ brainId }: { brainId: string }) {
   const weakCount = getWeakCardIds(activities, brainId).length;
 
   const startSession = () => {
-    const session = buildSession(cards, { mode, limit: 20 });
+    const session = buildModeSession(cards, mode, objectives, mastery, { limit: 20 });
     if (!session.length) return;
     setSessionIds(session.map((c) => c.id));
     setIdx(0);
@@ -88,7 +88,7 @@ export function LearnTab({ brainId }: { brainId: string }) {
   }
 
   if (!sessionIds) {
-    const dueNow = buildSession(cards, { mode, limit: 999 }).length;
+    const dueNow = buildModeSession(cards, mode, objectives, mastery, { limit: 999 }).length;
     return (
       <div className="card-surface rounded-2xl p-8 text-center">
         <div className="text-3xl">📚</div>

@@ -42,6 +42,13 @@ import {
   suggestMnemonics,
   mnemonicsToCards,
   pathFromObjectives,
+  runLoopStage,
+  filterCardsForMode,
+  currentObjectiveId,
+  makeArtifact,
+  gradeQuality,
+  type LoopStage,
+  type MediaAsset,
   type Activity,
   type Artifact,
   type Atom,
@@ -73,6 +80,7 @@ interface Database {
   mastery: MasteryState[];
   paths: Path[];
   artifacts: Artifact[];
+  mediaAssets: MediaAsset[];
 }
 
 const EMPTY_DB: Database = {
@@ -87,6 +95,7 @@ const EMPTY_DB: Database = {
   mastery: [],
   paths: [],
   artifacts: [],
+  mediaAssets: [],
 };
 
 const STORAGE_KEY = "learn_anything_vault_v1";
@@ -110,6 +119,7 @@ interface StoreContext {
   importVault: (json: string, mode?: "merge" | "replace") => boolean;
   importBrain: (json: string) => Brain | null;
   exportBrain: (brainId: string) => string;
+  exportBrainSlice: (brainId: string) => BrainExportSlice;
   exportBrainMarkdown: (brainId: string) => string;
   enrichSourceText: (sourceId: string) => Promise<boolean>;
   // brains
@@ -136,6 +146,8 @@ interface StoreContext {
   generateCardsFromSource: (sourceId: string) => Promise<Card[]>;
   generateVocabCards: (brainId: string) => Promise<Card[]>;
   generateMnemonicCards: (brainId: string) => Promise<Card[]>;
+  runModeStage: (brainId: string, stage: LoopStage) => Promise<void>;
+  addMediaAsset: (asset: MediaAsset) => void;
   setCardSuspended: (cardId: string, suspended: boolean) => void;
   // review
   gradeCard: (cardId: string, grade: ReviewGrade) => void;
@@ -178,7 +190,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
         return;
       }
-      setDb({ ...EMPTY_DB, ...parsed });
+      setDb({ ...EMPTY_DB, ...parsed, mediaAssets: parsed.mediaAssets ?? [] });
     } catch {
       /* fall through to empty */
     }
@@ -255,25 +267,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const exportVault = useCallback(() => JSON.stringify(db, null, 2), [db]);
 
-  const exportBrain = useCallback(
-    (brainId: string) => {
-      const slice = {
-        brain: db.brains.find((b) => b.id === brainId),
-        sources: db.sources.filter((s) => s.brainId === brainId),
-        atoms: db.atoms.filter((a) => a.brainId === brainId),
-        concepts: db.concepts.filter((c) => c.brainId === brainId),
-        edges: db.edges.filter((e) => e.brainId === brainId),
-        cards: db.cards.filter((c) => c.brainId === brainId),
-        activities: db.activities.filter((a) => a.brainId === brainId),
-        objectives: db.objectives.filter((o) => o.brainId === brainId),
-        mastery: db.mastery.filter((m) => m.brainId === brainId),
-        paths: db.paths.filter((p) => p.brainId === brainId),
-        artifacts: db.artifacts.filter((a) => a.brainId === brainId),
-        exportedAt: now(),
-      };
-      return JSON.stringify(slice, null, 2);
-    },
+  const exportBrainSlice = useCallback(
+    (brainId: string): BrainExportSlice => ({
+      brain: db.brains.find((b) => b.id === brainId),
+      sources: db.sources.filter((s) => s.brainId === brainId),
+      atoms: db.atoms.filter((a) => a.brainId === brainId),
+      concepts: db.concepts.filter((c) => c.brainId === brainId),
+      edges: db.edges.filter((e) => e.brainId === brainId),
+      cards: db.cards.filter((c) => c.brainId === brainId),
+      objectives: db.objectives.filter((o) => o.brainId === brainId),
+      mastery: db.mastery.filter((m) => m.brainId === brainId),
+      paths: db.paths.filter((p) => p.brainId === brainId),
+      artifacts: db.artifacts.filter((a) => a.brainId === brainId),
+    }),
     [db],
+  );
+
+  const exportBrain = useCallback(
+    (brainId: string) => JSON.stringify({ ...exportBrainSlice(brainId), exportedAt: now() }, null, 2),
+    [exportBrainSlice],
   );
 
   const exportBrainMarkdown = useCallback(
@@ -349,6 +361,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             mastery: mergeMastery(p.mastery, parsed.mastery ?? []),
             paths: mergeUnique(p.paths, parsed.paths ?? []),
             artifacts: mergeUnique(p.artifacts, parsed.artifacts ?? []),
+            mediaAssets: mergeUnique(p.mediaAssets ?? [], parsed.mediaAssets ?? []),
           };
         });
         return true;
@@ -728,6 +741,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
+      cards = filterCardsForMode(cards, mode, source.text);
+
       if (cards.length) commit((p) => ({ ...p, cards: [...p.cards, ...cards] }));
       return cards;
     },
@@ -754,6 +769,48 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return cards;
     },
     [db.atoms, commit],
+  );
+
+  const runModeStage = useCallback(
+    async (brainId: string, stage: LoopStage) => {
+      const brain = db.brains.find((b) => b.id === brainId);
+      if (!brain) return;
+      const mode = getMode(brain.modeId, brain.domainType);
+      const sources = db.sources.filter((s) => s.brainId === brainId);
+      const atoms = db.atoms.filter((a) => a.brainId === brainId);
+      const out = runLoopStage(mode, stage, {
+        brainId,
+        mode,
+        text: sources.map((s) => s.text).join("\n").slice(0, 8000),
+        atoms,
+        sources,
+        concepts: db.concepts.filter((c) => c.brainId === brainId),
+        edges: db.edges.filter((e) => e.brainId === brainId),
+        goal: brain.goal,
+      });
+
+      commit((p) => {
+        let cards = p.cards;
+        let artifacts = p.artifacts;
+        if (out.cards?.length) cards = [...cards, ...out.cards];
+        if (out.artifactBody) {
+          const quality = gradeQuality(out.artifactBody, [], out.artifactBody, mode.bloomTargets);
+          if (quality.score >= mode.qualityThreshold) {
+            artifacts = [
+              ...artifacts,
+              makeArtifact("summary", brainId, out.artifactTitle ?? "Generated", out.artifactBody, [], quality),
+            ];
+          }
+        }
+        return { ...p, cards, artifacts };
+      });
+    },
+    [db, commit],
+  );
+
+  const addMediaAsset = useCallback(
+    (asset: MediaAsset) => commit((p) => ({ ...p, mediaAssets: [...(p.mediaAssets ?? []), asset] })),
+    [commit],
   );
 
   // ---- Review ----
@@ -786,7 +843,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const logActivity = useCallback<StoreContext["logActivity"]>(
     (a) => {
-      const activity: Activity = { ...a, id: newId("act"), at: a.at ?? now() };
+      const brainObjectives = db.objectives.filter((o) => o.brainId === a.brainId);
+      const brainMastery = db.mastery.filter((m) => m.brainId === a.brainId);
+      const objectiveId = a.objectiveId ?? currentObjectiveId(brainObjectives, brainMastery);
+      const activity: Activity = { ...a, objectiveId, id: newId("act"), at: a.at ?? now() };
       commit((p) => {
         let mastery = p.mastery;
         if (activity.objectiveId) {
@@ -800,7 +860,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
       return activity;
     },
-    [commit],
+    [commit, db.objectives, db.mastery],
   );
 
   const addArtifact = useCallback(
@@ -845,6 +905,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       importVault,
       importBrain,
       exportBrain,
+      exportBrainSlice,
       exportBrainMarkdown,
       enrichSourceText,
       createBrain,
@@ -862,6 +923,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       generateCardsFromSource,
       generateVocabCards,
       generateMnemonicCards,
+      runModeStage,
+      addMediaAsset,
       setCardSuspended,
       gradeCard,
       logActivity,
@@ -880,6 +943,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       importVault,
       importBrain,
       exportBrain,
+      exportBrainSlice,
       exportBrainMarkdown,
       enrichSourceText,
       createBrain,
@@ -897,6 +961,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       generateCardsFromSource,
       generateVocabCards,
       generateMnemonicCards,
+      runModeStage,
+      addMediaAsset,
       setCardSuspended,
       gradeCard,
       logActivity,

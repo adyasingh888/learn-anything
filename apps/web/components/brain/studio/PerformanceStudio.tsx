@@ -1,16 +1,20 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useStore } from "@/lib/store";
+import { analyzeRecordingMeta, newId, now } from "@learn-anything/core";
+import { useBrain, useStore } from "@/lib/store";
 import { useRecorder } from "../StudioTab";
 
 export function PerformanceStudio({ brainId }: { brainId: string }) {
-  const { logActivity } = useStore();
+  const { logActivity, addMediaAsset } = useStore();
+  const { activities } = useBrain(brainId);
   const rec = useRecorder();
   const [targetBpm, setTargetBpm] = useState(80);
   const [bpm, setBpm] = useState(80);
   const [playing, setPlaying] = useState(false);
   const [note, setNote] = useState<string>("—");
   const [practiceLog, setPracticeLog] = useState(false);
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [refUrl, setRefUrl] = useState<string | null>(null);
   const [practiceSec, setPracticeSec] = useState(0);
 
   const audioRef = useRef<AudioContext | null>(null);
@@ -78,7 +82,20 @@ export function PerformanceStudio({ brainId }: { brainId: string }) {
     if (practiceTimer.current) clearInterval(practiceTimer.current);
     setPracticeLog(false);
     if (practiceSec > 0) {
-      logActivity({ brainId, kind: "recording", durationSec: practiceSec });
+      const meta = analyzeRecordingMeta({ durationSec: practiceSec, targetBpm: bpm });
+      setAnalysis(meta.summary);
+      logActivity({ brainId, kind: "recording", durationSec: practiceSec, score: meta.score });
+      if (rec.url) {
+        addMediaAsset({
+          id: newId("media"),
+          brainId,
+          kind: "audio",
+          ref: rec.url,
+          durationSec: practiceSec,
+          analysis: { bpm, score: meta.score },
+          createdAt: now(),
+        });
+      }
     }
   };
 
@@ -147,10 +164,32 @@ export function PerformanceStudio({ brainId }: { brainId: string }) {
         {rec.url && (
           <div className="mt-3">
             <p className="text-xs text-[var(--color-muted)]">Last take — listen back and self-critique:</p>
+            {analysis && <p className="mt-1 text-xs text-[var(--color-accent-2)]">{analysis}</p>}
             <audio controls src={rec.url} className="mt-2 w-full" />
           </div>
         )}
       </div>
+
+      <div className="card-surface rounded-2xl p-4">
+        <h3 className="text-sm font-semibold">Reference track</h3>
+        <p className="mt-1 text-xs text-[var(--color-muted)]">Upload audio to practice against (stays local).</p>
+        <input type="file" accept="audio/*" className="mt-2 text-xs" onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) setRefUrl(URL.createObjectURL(f));
+        }} />
+        {refUrl && <audio controls src={refUrl} className="mt-2 w-full" />}
+      </div>
+
+      {activities.filter((a) => a.kind === "recording").length > 0 && (
+        <div className="card-surface rounded-2xl p-4">
+          <h3 className="text-sm font-semibold">Practice history</h3>
+          <ul className="mt-2 space-y-1 text-xs text-[var(--color-text-secondary)]">
+            {activities.filter((a) => a.kind === "recording").slice(-5).reverse().map((a) => (
+              <li key={a.id}>· {a.durationSec ?? 0}s{a.score != null ? ` · ${Math.round(a.score * 100)}%` : ""}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
