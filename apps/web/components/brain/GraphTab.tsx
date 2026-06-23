@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { components, sharesSource, suggestRelatedReading } from "@learn-anything/core";
+import { components, sharesSource } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
+import { RelatedReadingPanel } from "./RelatedReadingPanel";
 
 export function GraphTab({ brainId }: { brainId: string }) {
   const { atoms, concepts, edges, sources } = useBrain(brainId);
@@ -24,17 +25,6 @@ export function GraphTab({ brainId }: { brainId: string }) {
   });
 
   const confirmed = edges.filter((e) => e.weight >= 1);
-
-  const related = useMemo(
-    () =>
-      suggestRelatedReading(
-        concepts.map((c) => c.label),
-        sources.map((s) => s.title),
-        sources.map((s) => s.text.slice(0, 500)).join(" "),
-        6,
-      ),
-    [concepts, sources],
-  );
 
   const clusters = useMemo(() => {
     const nodeIds = atoms.map((a) => a.id);
@@ -84,33 +74,11 @@ export function GraphTab({ brainId }: { brainId: string }) {
       <section>
         <h3 className="text-sm font-semibold">Suggested reading (outside your library)</h3>
         <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-          Papers and articles you haven&apos;t captured yet — open in Google Scholar, then save good ones back to Sources.
+          Real papers from Semantic Scholar + web results — save any into your brain with one click.
         </p>
-        {sources.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--color-muted)]">Capture at least one source to get suggestions.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {related.map((r) => (
-              <div key={r.query} className="card-surface rounded-xl p-4">
-                <p className="font-medium">{r.title}</p>
-                <p className="mt-0.5 text-xs text-[var(--color-muted)]">{r.reason}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <a href={r.scholarUrl} target="_blank" rel="noreferrer" className="btn btn-primary text-xs">
-                    Google Scholar ↗
-                  </a>
-                  <a href={r.semanticScholarUrl} target="_blank" rel="noreferrer" className="btn text-xs">
-                    Semantic Scholar ↗
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {sources.length === 1 && (
-          <p className="mt-3 rounded-lg bg-[var(--color-accent-soft)] p-3 text-xs text-[var(--color-text-secondary)]">
-            💡 With only one paper, cross-links appear after you capture a <strong>second source</strong> on a related topic.
-          </p>
-        )}
+        <div className="mt-3">
+          <RelatedReadingPanel brainId={brainId} />
+        </div>
       </section>
 
       {proposed.length > 0 && (

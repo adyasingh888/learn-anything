@@ -15,6 +15,12 @@ A privacy-first **second brain that teaches you**. Capture links, notes, and fil
 - **10 learning modes** — language, concept mastery, research, exam prep, practice studio, etc.
 - **Privacy** — local-first storage; optional AES-256 vault encryption on-device
 
+## Free tier (no API keys)
+
+See [docs/FREE_TIER.md](docs/FREE_TIER.md) for everything that works without keys: Semantic Scholar paper search, Jina Reader for PBS/articles, YouTube transcripts, on-device tutor, FSRS review, and more.
+
+Optional env vars (`LLM_API_KEY`, `JINA_API_KEY`) only improve quality/limits — see `.env.example`.
+
 ## Quick start (local)
 
 ```bash
