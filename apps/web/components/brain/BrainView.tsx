@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { getDomainInfo, getMode } from "@learn-anything/core";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
@@ -25,7 +26,19 @@ export function BrainView({ brainId }: { brainId: string }) {
 
 function Inner({ brainId }: { brainId: string }) {
   const { brain, cards } = useBrain(brainId);
-  const [tab, setTab] = useState<Tab>("sources");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams.get("tab") as Tab | null;
+  const [tab, setTab] = useState<Tab>(tabParam && isTab(tabParam) ? tabParam : "sources");
+
+  useEffect(() => {
+    if (tabParam && isTab(tabParam)) setTab(tabParam);
+  }, [tabParam]);
+
+  const goTab = (t: Tab) => {
+    setTab(t);
+    router.replace(`/brain/${brainId}?tab=${t}`, { scroll: false });
+  };
 
   if (!brain) {
     return (
@@ -56,7 +69,7 @@ function Inner({ brainId }: { brainId: string }) {
       <div className="flex items-center gap-3">
         <span className="text-3xl">{domain?.emoji ?? "🧠"}</span>
         <div>
-          <h1 className="text-xl font-bold tracking-tight">{brain.name}</h1>
+          <h1 className="page-title text-xl font-bold tracking-tight">{brain.name}</h1>
           <p className="text-xs text-[var(--color-muted)]">
             {mode.name} · {mode.tagline}
           </p>
@@ -70,7 +83,8 @@ function Inner({ brainId }: { brainId: string }) {
         {tabs.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            type="button"
+            onClick={() => goTab(t.id)}
             className={`whitespace-nowrap rounded-t-lg px-3 py-2 text-sm font-medium transition ${
               tab === t.id
                 ? "border-b-2 border-[var(--color-accent)] text-[var(--color-text)]"
@@ -83,7 +97,7 @@ function Inner({ brainId }: { brainId: string }) {
       </nav>
 
       <div className="py-5">
-        {tab === "sources" && <SourcesTab brainId={brainId} />}
+        {tab === "sources" && <SourcesTab brainId={brainId} onGoGraph={() => goTab("graph")} />}
         {tab === "graph" && <GraphTab brainId={brainId} />}
         {tab === "learn" && <LearnTab brainId={brainId} />}
         {tab === "tutor" && <TutorTab brainId={brainId} />}
@@ -92,6 +106,10 @@ function Inner({ brainId }: { brainId: string }) {
       </div>
     </main>
   );
+}
+
+function isTab(x: string): x is Tab {
+  return ["sources", "graph", "learn", "tutor", "studio", "settings"].includes(x);
 }
 
 function studioLabel(domain: string): string {

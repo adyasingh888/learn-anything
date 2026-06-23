@@ -19,12 +19,12 @@ import {
   DEFAULT_PRIVACY_POLICY,
   HashingEmbedder,
   buildSession,
-  chunkText,
   createScheduler,
   defaultModeId,
   deriveTitle,
   dueCount,
   extractKeyphrases,
+  distillToAtomDrafts,
   generateFlashcardsHeuristic,
   getMode,
   newCardState,
@@ -109,10 +109,14 @@ interface StoreContext {
   deleteSource: (id: string) => void;
   // atoms + graph
   addAtom: (brainId: string, title: string, body: string, sourceIds?: string[]) => Promise<Atom>;
+  /** Split one source into multiple atoms (Graph tab). Returns count created. */
+  distillSourceToAtoms: (sourceId: string) => Promise<number>;
   confirmEdge: (id: string) => void;
   rejectEdge: (id: string) => void;
+  /** Remove same-source edge suggestions (legacy noise). */
+  pruneSameSourceEdges: (brainId: string) => void;
   // generation
-  generateCardsFromSource: (sourceId: string) => Card[];
+  generateCardsFromSource: (sourceId: string) => Promise<Card[]>;
   // review
   gradeCard: (cardId: string, grade: ReviewGrade) => void;
   // activities / mastery
@@ -360,20 +364,126 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [commit],
   );
 
+  const pruneSameSourceEdges = useCallback(
+    (brainId: string) =>
+      commit((p) => {
+        const atomsById = new Map(p.atoms.map((a) => [a.id, a]));
+        const shares = (e: Edge) => {
+          const a = atomsById.get(e.from);
+          const b = atomsById.get(e.to);
+          if (!a || !b) return false;
+          return a.sourceIds.some((id) => b.sourceIds.includes(id));
+        };
+        return {
+          ...p,
+          edges: p.edges.filter((e) => e.brainId !== brainId || e.weight >= 1 || !shares(e)),
+        };
+      }),
+    [commit],
+  );
+
+  const distillSourceToAtoms = useCallback(
+    async (sourceId: string) => {
+      const source = db.sources.find((s) => s.id === sourceId);
+      if (!source || source.text.length < 20) return 0;
+
+      const drafts = distillToAtomDrafts(source.text, source.title);
+      if (!drafts.length) return 0;
+
+      const embedded = await Promise.all(
+        drafts.map(async (d) => ({
+          ...d,
+          embedding: await embedder.embed(`${d.title}\n${d.body}`),
+        })),
+      );
+
+      commit((p) => {
+        let concepts = [...p.concepts];
+        const newAtoms: Atom[] = [];
+        const newEdges: Edge[] = [];
+        const existing = p.atoms.filter((a) => a.brainId === source.brainId);
+
+        for (const d of embedded) {
+          const phrases = extractKeyphrases(`${d.title}\n${d.body}`, 4);
+          const conceptIds: string[] = [];
+          for (const ph of phrases) {
+            const { concept, created } = upsertConcept(concepts, source.brainId, ph);
+            if (created) concepts = [...concepts, concept];
+            conceptIds.push(concept.id);
+          }
+          const atom: Atom = {
+            id: newId("atom"),
+            brainId: source.brainId,
+            title: d.title,
+            body: d.body,
+            sourceIds: [source.id],
+            embedding: d.embedding,
+            conceptIds,
+            createdAt: now(),
+            updatedAt: now(),
+          };
+          newAtoms.push(atom);
+          newEdges.push(...suggestEdges(atom, [...existing, ...newAtoms.slice(0, -1)], { brainId: source.brainId }));
+        }
+
+        return {
+          ...p,
+          atoms: [...p.atoms, ...newAtoms],
+          concepts,
+          edges: [...p.edges, ...newEdges],
+        };
+      });
+
+      return drafts.length;
+    },
+    [db.sources, commit],
+  );
+
   // ---- Generation ----
-  const generateCardsFromSource = useCallback<StoreContext["generateCardsFromSource"]>(
-    (sourceId) => {
+  const generateCardsFromSource = useCallback(
+    async (sourceId: string): Promise<Card[]> => {
       const source = db.sources.find((s) => s.id === sourceId);
       if (!source) return [];
       const brain = db.brains.find((b) => b.id === source.brainId);
       const mode = getMode(brain?.modeId, brain?.domainType ?? "general");
-      const chunks = chunkText(source.text, 1200);
-      const cards = generateFlashcardsHeuristic(chunks.join("\n\n") || source.text, {
-        brainId: source.brainId,
-        sourceIds: [source.id],
-        maxCards: 12,
-        bloomTargets: mode.bloomTargets,
-      });
+
+      let cards: Card[] = [];
+      try {
+        const res = await fetch("/api/generate-cards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: source.text,
+            title: source.title,
+            brainId: source.brainId,
+            sourceId: source.id,
+            bloomTargets: mode.bloomTargets,
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { cards?: Card[] };
+          cards = (data.cards ?? []).map((c) => ({
+            ...c,
+            id: newId("card"),
+            fsrs: newCardState(),
+            createdAt: now(),
+            atomIds: c.atomIds ?? [],
+            conceptIds: c.conceptIds ?? [],
+          }));
+        }
+      } catch {
+        /* use heuristic */
+      }
+
+      if (!cards.length) {
+        cards = generateFlashcardsHeuristic(source.text, {
+          brainId: source.brainId,
+          sourceIds: [source.id],
+          maxCards: 12,
+          bloomTargets: mode.bloomTargets,
+        });
+      }
+
       if (cards.length) commit((p) => ({ ...p, cards: [...p.cards, ...cards] }));
       return cards;
     },
@@ -448,8 +558,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addSource,
       deleteSource,
       addAtom,
+      distillSourceToAtoms,
       confirmEdge,
       rejectEdge,
+      pruneSameSourceEdges,
       generateCardsFromSource,
       gradeCard,
       logActivity,
@@ -470,8 +582,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addSource,
       deleteSource,
       addAtom,
+      distillSourceToAtoms,
       confirmEdge,
       rejectEdge,
+      pruneSameSourceEdges,
       generateCardsFromSource,
       gradeCard,
       logActivity,

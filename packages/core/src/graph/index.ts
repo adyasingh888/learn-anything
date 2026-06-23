@@ -29,22 +29,25 @@ export function nearest<T extends { embedding?: number[] }>(
 
 /**
  * Propose edges between a newly added atom and the rest of the graph.
- * Combines semantic similarity (embedding) with shared-concept overlap.
+ * Only links atoms from DIFFERENT sources — chunks from the same article are
+ * not useful "connections". Cross-source links are what build a literature graph.
  */
 export function suggestEdges(
   atom: Atom,
   others: Atom[],
   opts: { brainId: ID; threshold?: number; max?: number } = { brainId: atom.brainId },
 ): Edge[] {
-  const threshold = opts.threshold ?? 0.35;
+  const threshold = opts.threshold ?? 0.28;
   const max = opts.max ?? 6;
   if (!atom.embedding) return [];
+
   const candidates = others
-    .filter((o) => o.id !== atom.id && o.embedding)
+    .filter((o) => o.id !== atom.id && o.embedding && !sharesSource(atom, o))
     .map((o) => {
       const sem = cosineSimilarity(atom.embedding!, o.embedding!);
       const shared = sharedCount(atom.conceptIds, o.conceptIds);
-      const score = sem + shared * 0.1;
+      // Boost cross-source links that share concepts (same theme, different paper).
+      const score = sem + shared * 0.15 + 0.05;
       return { o, score };
     })
     .filter((c) => c.score >= threshold)
@@ -57,8 +60,15 @@ export function suggestEdges(
     from: atom.id,
     to: o.id,
     relation: "related" as EdgeRelation,
-    weight: Math.min(0.95, score), // auto-links never start fully confirmed
+    weight: Math.min(0.95, score),
   }));
+}
+
+/** True when two atoms come from the same captured source (same article). */
+export function sharesSource(a: Atom, b: Atom): boolean {
+  if (!a.sourceIds.length || !b.sourceIds.length) return false;
+  const set = new Set(a.sourceIds);
+  return b.sourceIds.some((id) => set.has(id));
 }
 
 function sharedCount(a: ID[], b: ID[]): number {

@@ -9,7 +9,8 @@
  * - Every generation runs through `gradeQuality()` — a verification pass that
  *   checks grounding, Bloom coverage and flags unsupported content.
  */
-import { extractKeyphrases } from "../ingest/index.js";
+import { extractKeyphrases, chunkText } from "../ingest/index.js";
+import { tokenize } from "../embeddings/index.js";
 import { newId, now } from "../ids.js";
 import type {
   Artifact,
@@ -54,10 +55,77 @@ export class HeuristicProvider implements LLMProvider {
   readonly local = true;
 
   async complete(messages: LLMMessage[]): Promise<string> {
-    const last = messages[messages.length - 1]?.content ?? "";
-    const sentences = splitSentences(last);
-    return sentences.slice(0, 3).join(" ") || "I need more context in this brain to answer well.";
+    const userMsg = messages.find((m) => m.role === "user")?.content ?? "";
+    const taskMatch = userMsg.match(/Task:\s*([\s\S]+)$/);
+    const contextMatch = userMsg.match(/Context:\s*([\s\S]*?)(?:\n\nTask:|$)/);
+    const task = taskMatch?.[1]?.trim() ?? userMsg;
+    const context = contextMatch?.[1]?.trim() ?? userMsg;
+    return explainFromContext(task, context);
   }
+}
+
+/**
+ * Local tutor: finds relevant sentences from captured material and structures
+ * a real explanation — not three random sentences glued together.
+ */
+export function explainFromContext(task: string, context: string): string {
+  if (!context || context === "(no captured context yet)" || context.length < 40) {
+    return [
+      "I don't have enough material in this brain yet to explain that well.",
+      "",
+      "**What to do:**",
+      "1. Capture a link or paste notes in **Sources**",
+      "2. Hit **Distill to atoms** (or save a link — it auto-distills now)",
+      "3. Add a **second source** on a related topic so the graph can link across papers",
+      "",
+      "For richer explanations, enable cloud AI in this brain's Settings (or set `LLM_API_KEY` on the server).",
+    ].join("\n");
+  }
+
+  const queryTerms = new Set(tokenize(task));
+  const sentences = splitSentences(context);
+
+  const scored = sentences
+    .map((s) => ({
+      s,
+      score: tokenize(s).filter((t) => queryTerms.has(t)).length,
+    }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const relevant =
+    scored.length > 0 ? scored.slice(0, 6).map((x) => x.s) : pickBestSentences(sentences, 6);
+
+  const keys = extractKeyphrases(relevant.join(" "), 6);
+  const taskLower = task.toLowerCase();
+
+  let intro = "Here's what your captured material says:";
+  if (/explain|concept|simply|understand/.test(taskLower)) {
+    intro = "Here's an explanation drawn from your sources:";
+  } else if (/summar|key claim|theme/.test(taskLower)) {
+    intro = "Summary of key points from your material:";
+  } else if (/gap|missing|what should/.test(taskLower)) {
+    intro = "Based on what you've captured, consider exploring:";
+  }
+
+  const body = relevant.map((s) => `• ${s}`).join("\n");
+  const keyBlock =
+    keys.length > 0
+      ? `\n\n**Core ideas:** ${keys.map((k) => `\`${k}\``).join(", ")}`
+      : "";
+
+  const followUp =
+    scored.length === 0
+      ? "\n\n*(Matched loosely — try distilling into atoms or capture more on this topic.)*"
+      : "\n\n**Go deeper:** Can you explain this without looking? Try **Learn → teach-back** cards.";
+
+  return `${intro}\n\n${body}${keyBlock}${followUp}`;
+}
+
+function pickBestSentences(sentences: string[], n: number): string[] {
+  return sentences
+    .filter((s) => s.length > 40 && s.length < 320)
+    .slice(0, n);
 }
 
 function splitSentences(text: string): string[] {
@@ -87,15 +155,80 @@ export function generateFlashcardsHeuristic(
   text: string,
   opts: FlashcardOptions,
 ): Card[] {
+  const max = opts.maxCards ?? 12;
   const cards: Card[] = [];
-  const sentences = splitSentences(text);
-  const keyphrases = extractKeyphrases(text, 8);
-  const max = opts.maxCards ?? 10;
+  const chunks = chunkText(text, 700, 80);
 
-  // Cloze cards: hide a key phrase inside a definitional sentence.
-  for (const phrase of keyphrases) {
+  for (const chunk of chunks.slice(0, 4)) {
     if (cards.length >= max) break;
-    const sentence = sentences.find((s) => s.toLowerCase().includes(phrase));
+    cards.push(...cardsFromChunk(chunk, opts, max - cards.length));
+  }
+
+  if (cards.length === 0) {
+    cards.push(...cardsFromChunk(text, opts, max));
+  }
+
+  // Deduplicate by front text.
+  const seen = new Set<string>();
+  return cards.filter((c) => {
+    if (seen.has(c.front)) return false;
+    seen.add(c.front);
+    return true;
+  }).slice(0, max);
+}
+
+function cardsFromChunk(chunk: string, opts: FlashcardOptions, budget: number): Card[] {
+  const cards: Card[] = [];
+  const sentences = splitSentences(chunk);
+  const keyphrases = extractKeyphrases(chunk, 6);
+
+  // Teach-back per chunk (most valuable card type).
+  if (keyphrases[0] && budget > 0) {
+    cards.push(
+      makeCard({
+        ...opts,
+        kind: "teach-back",
+        bloom: "analyze",
+        front: `Explain **${keyphrases[0]}** in your own words.`,
+        back: sentences.slice(0, 2).join(" ") || chunk.slice(0, 200),
+      }),
+    );
+  }
+
+  // "Why / How" questions from causal sentences.
+  for (const s of sentences) {
+    if (cards.length >= budget) break;
+    const why = s.match(/^(.{15,120}?)\s+(?:because|since|as|due to)\s+(.{15,})$/i);
+    if (why) {
+      cards.push(
+        makeCard({
+          ...opts,
+          kind: "qa",
+          bloom: "understand",
+          front: `Why: ${why[1].trim()}?`,
+          back: why[2].trim(),
+        }),
+      );
+      continue;
+    }
+    const how = s.match(/^(.{10,80}?)\s+(?:by|through|via)\s+(.{15,})$/i);
+    if (how) {
+      cards.push(
+        makeCard({
+          ...opts,
+          kind: "qa",
+          bloom: "apply",
+          front: `How does ${how[1].trim()} work?`,
+          back: how[2].trim(),
+        }),
+      );
+    }
+  }
+
+  // Cloze on key phrases in substantive sentences.
+  for (const phrase of keyphrases.slice(0, 4)) {
+    if (cards.length >= budget) break;
+    const sentence = sentences.find((s) => s.length > 50 && s.toLowerCase().includes(phrase));
     if (!sentence) continue;
     const re = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, "i");
     cards.push(
@@ -103,16 +236,16 @@ export function generateFlashcardsHeuristic(
         ...opts,
         kind: "cloze",
         bloom: "remember",
-        front: sentence.replace(re, "{{…}}"),
+        front: sentence.replace(re, "**[…]**"),
         back: phrase,
       }),
     );
   }
 
-  // Q/A cards from "X is/are Y" definitions → understanding.
+  // Definition cards.
   for (const sentence of sentences) {
-    if (cards.length >= max) break;
-    const m = sentence.match(/^(.{3,60}?)\s+(?:is|are|refers to|means|describes)\s+(.{10,})$/i);
+    if (cards.length >= budget) break;
+    const m = sentence.match(/^(.{3,70}?)\s+(?:is|are|refers to|means|describes|defined as)\s+(.{12,})$/i);
     if (m) {
       cards.push(
         makeCard({
@@ -126,20 +259,7 @@ export function generateFlashcardsHeuristic(
     }
   }
 
-  // One free-recall (analyze/explain) card to push beyond rote memorization.
-  if (keyphrases[0]) {
-    cards.push(
-      makeCard({
-        ...opts,
-        kind: "teach-back",
-        bloom: "analyze",
-        front: `Explain "${keyphrases[0]}" in your own words, as if teaching a beginner.`,
-        back: sentences.slice(0, 2).join(" "),
-      }),
-    );
-  }
-
-  return cards.slice(0, max);
+  return cards;
 }
 
 function makeCard(
