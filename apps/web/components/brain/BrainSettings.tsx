@@ -1,12 +1,12 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { allModes, getMode } from "@learn-anything/core";
-import { isMastered, MASTERY_THRESHOLD } from "@learn-anything/core";
+import { isMastered, MASTERY_THRESHOLD, nextObjective } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 
 export function BrainSettings({ brainId }: { brainId: string }) {
-  const { brain, objectives, mastery } = useBrain(brainId);
-  const { updateBrain, deleteBrain } = useStore();
+  const { brain, objectives, mastery, paths } = useBrain(brainId);
+  const { updateBrain, deleteBrain, exportBrain } = useStore();
   const router = useRouter();
   if (!brain) return null;
 
@@ -58,6 +58,49 @@ export function BrainSettings({ brainId }: { brainId: string }) {
           </ul>
         </div>
       )}
+
+      {paths.length > 0 && objectives.length > 0 && (
+        <div className="card-surface rounded-2xl p-4">
+          <h3 className="text-sm font-semibold">Learning path</h3>
+          <p className="mt-0.5 text-xs text-[var(--color-muted)]">{paths[0].title}</p>
+          <ol className="mt-3 space-y-2">
+            {paths[0].objectiveIds.map((oid, i) => {
+              const o = objectives.find((x) => x.id === oid);
+              if (!o) return null;
+              const m = mastery.find((x) => x.objectiveId === oid);
+              const done = isMastered(m);
+              const current = nextObjective(objectives, new Map(mastery.map((x) => [x.objectiveId, x])))?.id === oid;
+              return (
+                <li key={oid} className={`rounded-lg border p-2 text-sm ${current ? "border-[var(--color-accent)]" : ""}`}>
+                  <span className="text-xs text-[var(--color-muted)]">Step {i + 1}</span>
+                  <p className="font-medium">
+                    {done ? "✓ " : current ? "→ " : ""}
+                    {o.title}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
+
+      <div className="card-surface rounded-2xl p-4">
+        <h3 className="text-sm font-semibold">Export brain</h3>
+        <p className="mt-0.5 text-xs text-[var(--color-muted)]">Portable JSON for this topic only.</p>
+        <button
+          type="button"
+          className="btn mt-3"
+          onClick={() => {
+            const blob = new Blob([exportBrain(brainId)], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `${brain.name.replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.json`;
+            a.click();
+          }}
+        >
+          ⬇ Export this brain
+        </button>
+      </div>
 
       <div className="card-surface rounded-2xl p-4">
         <h3 className="text-sm font-semibold">Learning mode</h3>

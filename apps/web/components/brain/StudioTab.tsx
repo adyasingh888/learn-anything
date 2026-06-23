@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useBrain } from "@/lib/store";
+import { CreativeStudio } from "./studio/CreativeStudio";
 import { CodeDrillStudio } from "./studio/CodeDrillStudio";
 import { PerformanceStudio } from "./studio/PerformanceStudio";
 import { LanguageStudio } from "./studio/LanguageStudio";
@@ -22,6 +23,8 @@ export function StudioTab({ brainId }: { brainId: string }) {
       return <ResearchStudio brainId={brainId} />;
     case "procedural":
       return <CodeDrillStudio brainId={brainId} />;
+    case "creative":
+      return <CreativeStudio brainId={brainId} />;
     default:
       return <TeachBackStudio brainId={brainId} />;
   }

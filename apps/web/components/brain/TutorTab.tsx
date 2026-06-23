@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { HashingEmbedder, buildGroundedPrompt, getMode, retrieve } from "@learn-anything/core";
+import { HashingEmbedder, buildGroundedPrompt, getMode, retrieve, socraticTurn } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 import { getProvider } from "@/lib/llm";
 
@@ -11,6 +11,7 @@ interface Msg {
   content: string;
   citations?: { label: string }[];
   offline?: boolean;
+  socratic?: boolean;
 }
 
 export function TutorTab({ brainId }: { brainId: string }) {
@@ -19,14 +20,18 @@ export function TutorTab({ brainId }: { brainId: string }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [awaitingAnswer, setAwaitingAnswer] = useState(false);
+  const lastQuestionRef = useRef<string>("");
   const endRef = useRef<HTMLDivElement>(null);
 
   const mode = getMode(brain?.modeId, brain?.domainType ?? "general");
   const allowCloud = brain?.privacy.aiProcessing === "cloud" && brain?.privacy.allowCloudGeneration;
+  const useSocratic =
+    !allowCloud &&
+    (mode.id === "concept-mastery" || mode.id === "research-scholar" || mode.id === "capture-digest");
 
   const buildRichContext = async (query: string) => {
     const rag = await retrieve(query, { embedder, atoms, sources, k: 8 });
-    // Always include source excerpts so tutor has material even with few atoms.
     const sourceBlock = sources
       .slice(0, 4)
       .map((s, i) => `[[S${i + 1}]] ${s.title}\n${s.text.slice(0, 1500)}`)
@@ -42,6 +47,21 @@ export function TutorTab({ brainId }: { brainId: string }) {
     setBusy(true);
     try {
       const ctx = await buildRichContext(q);
+      const context = ctx.promptContext || "(no captured context yet)";
+
+      if (useSocratic) {
+        const priorAnswer = awaitingAnswer ? q : undefined;
+        const turn = socraticTurn(lastQuestionRef.current || q, context, priorAnswer);
+        lastQuestionRef.current = q;
+        setAwaitingAnswer(turn.expectsAnswer);
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", content: turn.content, offline: true, socratic: true },
+        ]);
+        logActivity({ brainId, kind: "tutor", payload: { socratic: true } });
+        return;
+      }
+
       const provider = getProvider({ allowCloud: !!allowCloud });
       const persona =
         mode.id === "research-scholar"
@@ -49,7 +69,7 @@ export function TutorTab({ brainId }: { brainId: string }) {
           : mode.id === "concept-mastery" || mode.id === "capture-digest"
             ? "You are a patient tutor. Explain concepts simply with examples from the context."
             : "You are a rigorous, encouraging Socratic tutor.";
-      const prompt = buildGroundedPrompt(q, ctx.promptContext || "(no captured context yet)", { persona });
+      const prompt = buildGroundedPrompt(q, context, { persona });
       const text = await provider.complete(prompt);
       const usedOffline = provider.local || text.includes("don't have enough material");
       const citations = ctx.passages.slice(0, 4).map((p, i) => ({
@@ -70,19 +90,17 @@ export function TutorTab({ brainId }: { brainId: string }) {
       <div className="card-surface rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Tutor</h3>
-          <span className="chip">{allowCloud ? "☁️ Cloud AI" : "📱 On-device"}</span>
+          <span className="chip">
+            {allowCloud ? "☁️ Cloud AI" : useSocratic ? "🧠 Socratic" : "📱 On-device"}
+          </span>
         </div>
         <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-          Grounded in {sources.length} sources and {atoms.length} atoms. Ask to explain, summarize, or connect ideas.
+          Grounded in {sources.length} sources and {atoms.length} atoms.
+          {useSocratic && " Offline Socratic mode asks you questions before explaining."}
         </p>
         {!hasMaterial && (
           <p className="mt-2 rounded-lg bg-[var(--color-accent-soft)] p-2 text-xs">
             Capture a link in Sources first — the tutor reads your material, not the open web.
-          </p>
-        )}
-        {hasMaterial && !allowCloud && (
-          <p className="mt-2 text-xs text-[var(--color-muted)]">
-            Using on-device explanations. For richer answers, enable cloud AI in Settings or set <code className="text-[10px]">LLM_API_KEY</code> on the server.
           </p>
         )}
       </div>
@@ -105,7 +123,10 @@ export function TutorTab({ brainId }: { brainId: string }) {
             }`}
           >
             <p className="whitespace-pre-wrap">{m.content}</p>
-            {m.offline && m.role === "assistant" && (
+            {m.socratic && m.role === "assistant" && (
+              <p className="mt-2 text-[10px] text-[var(--color-muted)]">Socratic tutor · answer before continuing</p>
+            )}
+            {m.offline && !m.socratic && m.role === "assistant" && (
               <p className="mt-2 text-[10px] text-[var(--color-muted)]">On-device tutor · grounded in your captures</p>
             )}
             {m.citations && m.citations.length > 0 && (
@@ -130,7 +151,7 @@ export function TutorTab({ brainId }: { brainId: string }) {
       >
         <input
           className="input"
-          placeholder="Explain the main concept to me…"
+          placeholder={awaitingAnswer ? "Your answer to the question…" : "Explain the main concept to me…"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
         />

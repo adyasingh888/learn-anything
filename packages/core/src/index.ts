@@ -19,6 +19,10 @@ export * from "./rag/index.js";
 export * from "./generation/index.js";
 export * from "./session/index.js";
 export * from "./session/objectives.js";
+export * from "./session/pacing.js";
+export * from "./session/paths.js";
+export * from "./search/vault.js";
+export * from "./generation/socratic.js";
 export * from "./research/claims.js";
 export * from "./drill/code-tests.js";
 

@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { getDomainInfo, getMode } from "@learn-anything/core";
+import { useEffect, useMemo, useState } from "react";
+import { getDomainInfo, getMode, computePacing, nextObjective, isMastered } from "@learn-anything/core";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
 import { dueCount, useBrain, useStore } from "@/lib/store";
@@ -27,6 +27,15 @@ export function BrainView({ brainId }: { brainId: string }) {
 function Inner({ brainId }: { brainId: string }) {
   const { brain, cards, objectives, mastery } = useBrain(brainId);
   const { ensureObjectives } = useStore();
+  const masteryMap = useMemo(() => new Map(mastery.map((m) => [m.objectiveId, m])), [mastery]);
+  const currentObjective = useMemo(
+    () => nextObjective(objectives, masteryMap),
+    [objectives, masteryMap],
+  );
+  const pacing = useMemo(
+    () => computePacing(brain?.deadline, objectives, mastery),
+    [brain?.deadline, objectives, mastery],
+  );
   const searchParams = useSearchParams();
   const router = useRouter();
   const tabParam = searchParams.get("tab") as Tab | null;
@@ -92,6 +101,16 @@ function Inner({ brainId }: { brainId: string }) {
           Mastery: {avgMastery}% across {objectives.length} objective{objectives.length === 1 ? "" : "s"}
         </p>
       )}
+      {objectives.length > 0 && (
+        <p className={`mt-1 text-xs ${pacing.onTrack ? "text-[var(--color-muted)]" : "text-amber-600"}`}>
+          📅 {pacing.message}
+        </p>
+      )}
+      {currentObjective && !isMastered(masteryMap.get(currentObjective.id)) && (
+        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+          Up next: {currentObjective.title}
+        </p>
+      )}
 
       <nav className="mt-5 flex gap-1 overflow-x-auto border-b pb-px">
         {tabs.map((t) => (
@@ -136,6 +155,8 @@ function studioLabel(domain: string): string {
       return "Mock Exam";
     case "procedural":
       return "Drill";
+    case "creative":
+      return "Create";
     case "research":
       return "Synthesis";
     default:

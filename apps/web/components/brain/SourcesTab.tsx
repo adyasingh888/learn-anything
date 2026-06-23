@@ -14,7 +14,7 @@ function normalizeUrl(raw: string): string {
 
 export function SourcesTab({ brainId, onGoGraph }: { brainId: string; onGoGraph?: () => void }) {
   const { sources, cards, atoms } = useBrain(brainId);
-  const { addSource, deleteSource, generateCardsFromSource, distillSourceToAtoms } = useStore();
+  const { addSource, deleteSource, generateCardsFromSource, distillSourceToAtoms, enrichSourceText } = useStore();
   const [paste, setPaste] = useState("");
   const [bibPaste, setBibPaste] = useState("");
   const [showBib, setShowBib] = useState(false);
@@ -78,7 +78,7 @@ export function SourcesTab({ brainId, onGoGraph }: { brainId: string; onGoGraph?
       const res = await fetch("/api/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, fetchFullText: true }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -91,7 +91,7 @@ export function SourcesTab({ brainId, onGoGraph }: { brainId: string; onGoGraph?
         meta: data.meta,
       });
       const atomCount = await distillSourceToAtoms(source.id);
-      finishCapture(`Saved “${data.title}” (${data.meta?.source ?? "metadata"})`, atomCount);
+      finishCapture(`Saved “${data.title}” (${data.meta?.source ?? "metadata"}${data.meta?.fullText ? ", full text" : ""})`, atomCount);
     } catch {
       setToast({ msg: "Couldn't resolve identifier — try pasting the abstract as a note" });
     } finally {
@@ -302,6 +302,24 @@ export function SourcesTab({ brainId, onGoGraph }: { brainId: string; onGoGraph?
                   >
                     🧩 Re-distill atoms
                   </button>
+                  {(Boolean(s.meta?.openAccessPdf) || Boolean(s.meta?.arxivId)) && !s.meta?.fullText ? (
+                    <button
+                      type="button"
+                      className="btn text-xs"
+                      disabled={!!busy}
+                      onClick={async () => {
+                        setBusy("fulltext");
+                        const ok = await enrichSourceText(s.id);
+                        if (ok) await distillSourceToAtoms(s.id);
+                        setBusy(null);
+                        setToast({
+                          msg: ok ? "Full PDF text added and distilled" : "Could not fetch full text — try pasting manually",
+                        });
+                      }}
+                    >
+                      📄 Fetch full PDF
+                    </button>
+                  ) : null}
                   {atomCount > 0 && <span className="chip">{atomCount} atoms</span>}
                   {cardCount > 0 && <span className="chip">{cardCount} cards</span>}
                   <button type="button" className="btn text-xs" onClick={() => deleteSource(s.id)}>

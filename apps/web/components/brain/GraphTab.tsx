@@ -5,9 +5,11 @@ import { useBrain, useStore } from "@/lib/store";
 import { RelatedReadingPanel } from "./RelatedReadingPanel";
 import { ClaimEvidencePanel } from "./ClaimEvidencePanel";
 import { ConceptMapPanel } from "./ConceptMapPanel";
+import { GraphCanvas } from "./GraphCanvas";
 
 export function GraphTab({ brainId }: { brainId: string }) {
   const { atoms, concepts, edges, sources, brain } = useBrain(brainId);
+  const [highlightAtom, setHighlightAtom] = useState<string | null>(null);
   const { addAtom, confirmEdge, rejectEdge, pruneSameSourceEdges } = useStore();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -41,6 +43,15 @@ export function GraphTab({ brainId }: { brainId: string }) {
         <Stat label="Cross-source links" value={confirmed.length} />
       </div>
 
+      {atoms.length > 1 && (
+        <section>
+          <h3 className="text-sm font-semibold">Graph view</h3>
+          <div className="mt-2">
+            <GraphCanvas brainId={brainId} onSelectAtom={setHighlightAtom} />
+          </div>
+        </section>
+      )}
+
       {/* Atoms — the main thing distill creates */}
       <section>
         <h3 className="text-sm font-semibold">Your atoms</h3>
@@ -58,8 +69,9 @@ export function GraphTab({ brainId }: { brainId: string }) {
               .reverse()
               .map((a) => {
                 const src = a.sourceIds[0] ? sourceById.get(a.sourceIds[0]) : undefined;
+                const hl = highlightAtom === a.id;
                 return (
-                  <div key={a.id} className="card-surface rounded-xl p-4">
+                  <div key={a.id} className={`card-surface rounded-xl p-4 ${hl ? "ring-2 ring-[var(--color-accent)]" : ""}`}>
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">{a.title}</p>
                       {src && <span className="chip">from: {src.title.slice(0, 40)}{src.title.length > 40 ? "…" : ""}</span>}

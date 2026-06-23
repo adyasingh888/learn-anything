@@ -35,6 +35,7 @@ import {
   updateMastery,
   upsertConcept,
   objectivesFromGoal,
+  pathFromObjectives,
   type Activity,
   type Artifact,
   type Atom,
@@ -100,6 +101,8 @@ interface StoreContext {
   disableEncryption: () => void;
   exportVault: () => string;
   importVault: (json: string, mode?: "merge" | "replace") => boolean;
+  exportBrain: (brainId: string) => string;
+  enrichSourceText: (sourceId: string) => Promise<boolean>;
   // brains
   createBrain: (name: string, domainType: DomainType, goal?: string) => Brain;
   updateBrain: (id: string, patch: Partial<Brain>) => void;
@@ -241,6 +244,58 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const exportVault = useCallback(() => JSON.stringify(db, null, 2), [db]);
 
+  const exportBrain = useCallback(
+    (brainId: string) => {
+      const slice = {
+        brain: db.brains.find((b) => b.id === brainId),
+        sources: db.sources.filter((s) => s.brainId === brainId),
+        atoms: db.atoms.filter((a) => a.brainId === brainId),
+        concepts: db.concepts.filter((c) => c.brainId === brainId),
+        edges: db.edges.filter((e) => e.brainId === brainId),
+        cards: db.cards.filter((c) => c.brainId === brainId),
+        activities: db.activities.filter((a) => a.brainId === brainId),
+        objectives: db.objectives.filter((o) => o.brainId === brainId),
+        mastery: db.mastery.filter((m) => m.brainId === brainId),
+        paths: db.paths.filter((p) => p.brainId === brainId),
+        artifacts: db.artifacts.filter((a) => a.brainId === brainId),
+        exportedAt: now(),
+      };
+      return JSON.stringify(slice, null, 2);
+    },
+    [db],
+  );
+
+  const enrichSourceText = useCallback(
+    async (sourceId: string) => {
+      const source = db.sources.find((s) => s.id === sourceId);
+      const pdfUrl = source?.meta?.openAccessPdf as string | undefined;
+      const url = pdfUrl ?? source?.url;
+      if (!source || !url) return false;
+      try {
+        const res = await fetch("/api/ingest/fulltext", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        if (!res.ok) return false;
+        const data = (await res.json()) as { text?: string };
+        if (!data.text || data.text.length < source.text.length) return false;
+        commit((p) => ({
+          ...p,
+          sources: p.sources.map((s) =>
+            s.id === sourceId
+              ? { ...s, text: `${s.text}\n\n---\n\n${data.text}`, meta: { ...s.meta, fullText: true } }
+              : s,
+          ),
+        }));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [db.sources, commit],
+  );
+
   const importVault = useCallback(
     (json: string, mode: "merge" | "replace" = "merge") => {
       try {
@@ -300,11 +355,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         mastery: 0,
         lastUpdated: now(),
       }));
+      const paths = objectives.length ? [pathFromObjectives(brain.id, objectives)] : [];
       commit((p) => ({
         ...p,
         brains: [...p.brains, brain],
         objectives: [...p.objectives, ...objectives],
         mastery: [...p.mastery, ...mastery],
+        paths: [...p.paths, ...paths],
       }));
       return brain;
     },
@@ -332,6 +389,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               lastUpdated: now(),
             })),
           ];
+          const paths = [
+            ...p.paths.filter((path) => path.brainId !== id),
+            pathFromObjectives(id, newObjs),
+          ];
+          return {
+            ...p,
+            objectives,
+            mastery,
+            paths,
+            brains: p.brains.map((b) => (b.id === id ? { ...b, ...patch, updatedAt: now() } : b)),
+          };
         }
         return {
           ...p,
@@ -680,10 +748,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           mastery: 0,
           lastUpdated: now(),
         }));
+        const paths = [pathFromObjectives(brainId, objectives)];
         return {
           ...p,
           objectives: [...p.objectives, ...objectives],
           mastery: [...p.mastery, ...mastery],
+          paths: [...p.paths, ...paths],
         };
       }),
     [commit],
@@ -700,6 +770,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       disableEncryption,
       exportVault,
       importVault,
+      exportBrain,
+      enrichSourceText,
       createBrain,
       updateBrain,
       deleteBrain,
@@ -729,6 +801,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       disableEncryption,
       exportVault,
       importVault,
+      exportBrain,
+      enrichSourceText,
       createBrain,
       updateBrain,
       deleteBrain,
@@ -767,7 +841,8 @@ export function useBrain(brainId: string) {
     const artifacts = db.artifacts.filter((a) => a.brainId === brainId);
     const objectives = db.objectives.filter((o) => o.brainId === brainId);
     const mastery = db.mastery.filter((m) => m.brainId === brainId);
-    return { brain, sources, atoms, concepts, edges, cards, activities, artifacts, objectives, mastery };
+    const paths = db.paths.filter((p) => p.brainId === brainId);
+    return { brain, sources, atoms, concepts, edges, cards, activities, artifacts, objectives, mastery, paths };
   }, [db, brainId]);
 }
 

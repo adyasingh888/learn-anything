@@ -27,6 +27,13 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | Language dictation | Listen & type (Web Speech API, no key) |
 | Mastery objectives | Auto from brain goal; tracked via mock exams |
 | Vault import | Settings → merge exported JSON |
+| Global search | ⌘K across all brains, sources, atoms, cards |
+| Interactive graph | SVG force layout on Graph tab |
+| arXiv / PDF full text | Auto on resolve + manual “Fetch full PDF” |
+| Socratic tutor | Offline question loop for concept/research brains |
+| Creative studio | Exemplar → draft → rubric for creative domain |
+| Curriculum path | Objectives sequenced with deadline pacing |
+| Per-brain export | Settings → export single brain JSON |
 | PWA + extension | Install on phone; Chrome capture extension |
 
 ## Free external APIs we use (server-side, no user key)

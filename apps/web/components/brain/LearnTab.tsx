@@ -4,6 +4,7 @@ import {
   buildSession,
   createScheduler,
   getMode,
+  nextObjective,
   previewIntervals,
   type Card,
   type CardKind,
@@ -21,7 +22,7 @@ const GRADES: { grade: ReviewGrade; label: string; tone: string }[] = [
 const OPEN_KINDS: CardKind[] = ["free-recall", "teach-back", "problem", "speak", "produce"];
 
 export function LearnTab({ brainId }: { brainId: string }) {
-  const { brain, cards } = useBrain(brainId);
+  const { brain, cards, objectives, mastery } = useBrain(brainId);
   const { gradeCard } = useStore();
   const [sessionIds, setSessionIds] = useState<string[] | null>(null);
   const [idx, setIdx] = useState(0);
@@ -30,6 +31,8 @@ export function LearnTab({ brainId }: { brainId: string }) {
   const [selfAnswer, setSelfAnswer] = useState("");
 
   const mode = getMode(brain?.modeId, brain?.domainType ?? "general");
+  const masteryMap = useMemo(() => new Map(mastery.map((m) => [m.objectiveId, m])), [mastery]);
+  const currentObjective = useMemo(() => nextObjective(objectives, masteryMap), [objectives, masteryMap]);
   const scheduler = useMemo(
     () => createScheduler({ targetRetention: mode.scheduler.targetRetention }),
     [mode.scheduler.targetRetention],
@@ -80,6 +83,9 @@ export function LearnTab({ brainId }: { brainId: string }) {
           Spaced repetition (FSRS-6) at {Math.round(mode.scheduler.targetRetention * 100)}% target retention
           {mode.scheduler.interleave ? ", interleaved across concepts." : "."}
         </p>
+        {currentObjective && (
+          <p className="mt-2 text-xs text-[var(--color-accent)]">Current objective: {currentObjective.title}</p>
+        )}
         <button className="btn btn-primary mx-auto mt-4" onClick={startSession} disabled={dueNow === 0}>
           {dueNow === 0 ? "All caught up 🎉" : "Start review"}
         </button>
