@@ -5,6 +5,7 @@ import { getDomainInfo, getMode } from "@learn-anything/core";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
 import { NewBrainModal } from "@/components/NewBrainModal";
+import { ResurfacePanel } from "@/components/ResurfacePanel";
 import { dueCount, useStore } from "@/lib/store";
 
 export default function HomePage() {
@@ -72,6 +73,8 @@ function Dashboard() {
           })}
         </div>
       )}
+
+      <ResurfacePanel />
     </div>
   );
 }

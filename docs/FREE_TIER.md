@@ -14,8 +14,11 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | Heuristic flashcards | Teach-back, why/how, cloze from source chunks |
 | Link capture | Direct fetch + **Jina Reader** fallback (PBS, news, etc.) |
 | YouTube capture | Title + description + **auto transcript** when captions exist |
-| Related papers | **Semantic Scholar** search (200M+ papers, no key) |
-| Scholar search links | Google Scholar / Semantic Scholar query links |
+| DOI / arXiv paste | **Crossref** + **arXiv** metadata → sources + atoms |
+| BibTeX / Zotero import | Paste or upload `.bib` in Sources tab |
+| Related papers | **Semantic Scholar** + **OpenAlex** + **arXiv** (merged search) |
+| Web suggestions | **Jina Search** |
+| Spaced resurfacing | Home dashboard surfaces stale atoms & sources |
 | PWA + extension | Install on phone; Chrome capture extension |
 
 ## Free external APIs we use (server-side, no user key)
@@ -23,10 +26,12 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | API | Purpose | Key required? | Limits (typical) |
 |-----|---------|---------------|------------------|
 | [Semantic Scholar Graph API](https://api.semanticscholar.org/) | Find real papers, abstracts, citations | No (optional key for 1 RPS) | ~100 req / 5 min anonymous |
+| [OpenAlex](https://openalex.org/) | Scholarly catalog, abstracts, OA links | No (optional key for higher limits) | Generous free tier |
+| [Crossref REST API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/) | DOI → title, abstract, authors | No | Polite pool |
+| [arXiv API](https://arxiv.org/help/api) | Preprint metadata + PDF links | No | Reasonable use |
 | [Jina Reader](https://jina.ai/reader) | Clean markdown from URLs (PBS, blogs) | No (optional key → 500 RPM) | 20 RPM anonymous |
 | [Jina Search](https://jina.ai/reader) | Web search → readable results | No | Same pool as Reader |
 | YouTube Innertube | Captions / transcripts | No | Unofficial; may break |
-| Crossref (planned) | DOI → metadata | No | Polite pool |
 
 ## Optional keys (you add in Vercel → Environment Variables)
 
@@ -35,16 +40,19 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | `LLM_API_KEY` | Rich tutor, LLM flashcards, synthesis |
 | `JINA_API_KEY` | Faster/heavier URL reading & search |
 | `SEMANTIC_SCHOLAR_API_KEY` | Higher paper search rate limits |
+| `OPENALEX_API_KEY` | Higher OpenAlex rate limits |
+| `OLLAMA_BASE_URL` + `OLLAMA_MODEL` | Local LLM (e.g. `http://127.0.0.1:11434`, `llama3.2`) — no cloud key |
 
-## Roadmap (still free-tier friendly)
+## Local LLM (Ollama)
 
-1. **One-click “Save paper”** from Semantic Scholar results into Sources  
-2. **Crossref** DOI lookup when user pastes a DOI  
-3. **OpenAlex** when user adds free `OPENALEX_API_KEY` (optional)  
-4. **ArXiv** PDF text for preprints  
-5. **Local LLM** via Ollama in Privacy Mode (fully on-device, user runs model)  
-6. **Spaced resurfacing** — resurface old atoms without review session  
-7. **BibTeX / Zotero import** for research brains  
+For fully local generation, run [Ollama](https://ollama.com/) and set:
+
+```bash
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3.2
+```
+
+The `/api/llm` route tries cloud first (if `LLM_API_KEY` is set), then Ollama, then falls back to on-device heuristics. Ollama works best in local dev or self-hosted deploys — Vercel cannot reach your laptop.
 
 ## What still needs an LLM (honest)
 

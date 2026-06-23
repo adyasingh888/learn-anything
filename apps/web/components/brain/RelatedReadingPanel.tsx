@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { extractKeyphrases } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 
-interface ScholarPaper {
-  paperId: string;
+interface Paper {
+  id: string;
   title: string;
   abstract?: string;
   year?: number;
@@ -13,6 +13,7 @@ interface ScholarPaper {
   authors?: string[];
   openAccessPdf?: string;
   venue?: string;
+  source?: string;
 }
 
 interface WebResult {
@@ -24,7 +25,7 @@ interface WebResult {
 export function RelatedReadingPanel({ brainId }: { brainId: string }) {
   const { sources, concepts, atoms } = useBrain(brainId);
   const { addSource, distillSourceToAtoms } = useStore();
-  const [papers, setPapers] = useState<ScholarPaper[]>([]);
+  const [papers, setPapers] = useState<Paper[]>([]);
   const [web, setWeb] = useState<WebResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export function RelatedReadingPanel({ brainId }: { brainId: string }) {
         ]);
 
         if (!cancelled && paperRes.ok) {
-          const data = (await paperRes.json()) as { papers?: ScholarPaper[] };
+          const data = (await paperRes.json()) as { papers?: Paper[] };
           setPapers(data.papers ?? []);
         }
         if (!cancelled && webRes.ok) {
@@ -84,8 +85,8 @@ export function RelatedReadingPanel({ brainId }: { brainId: string }) {
     };
   }, [brainId, sources.length, conceptLabels.join(","), seedTitles.join("|")]);
 
-  const savePaper = async (paper: ScholarPaper) => {
-    setSaving(paper.paperId);
+  const savePaper = async (paper: Paper) => {
+    setSaving(paper.id);
     try {
       const text = [
         paper.title,
@@ -93,8 +94,9 @@ export function RelatedReadingPanel({ brainId }: { brainId: string }) {
         paper.venue ? `Venue: ${paper.venue}` : "",
         paper.year ? `Year: ${paper.year}` : "",
         paper.citationCount != null ? `Citations: ${paper.citationCount}` : "",
+        paper.source ? `Source: ${paper.source}` : "",
         "",
-        paper.abstract ?? "(No abstract in Semantic Scholar)",
+        paper.abstract ?? "(No abstract available)",
       ]
         .filter(Boolean)
         .join("\n");
@@ -103,7 +105,7 @@ export function RelatedReadingPanel({ brainId }: { brainId: string }) {
         title: paper.title,
         url: paper.openAccessPdf ?? paper.url,
         text,
-        meta: { paperId: paper.paperId, source: "semantic-scholar" },
+        meta: { paperId: paper.id, source: paper.source ?? "papers-search" },
       });
       await distillSourceToAtoms(source.id);
     } finally {
@@ -147,13 +149,13 @@ export function RelatedReadingPanel({ brainId }: { brainId: string }) {
       {papers.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-            Academic papers (Semantic Scholar · free API)
+            Academic papers (Semantic Scholar · OpenAlex · arXiv · free)
           </p>
           {papers.map((p) => (
-            <div key={p.paperId} className="card-surface rounded-xl p-4">
+            <div key={p.id} className="card-surface rounded-xl p-4">
               <p className="font-medium leading-snug">{p.title}</p>
               <p className="mt-1 text-xs text-[var(--color-muted)]">
-                {[p.year, p.citationCount != null ? `${p.citationCount} citations` : "", p.authors?.slice(0, 2).join(", ")]
+                {[p.year, p.citationCount != null ? `${p.citationCount} citations` : "", p.authors?.slice(0, 2).join(", "), p.source]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
@@ -164,10 +166,10 @@ export function RelatedReadingPanel({ brainId }: { brainId: string }) {
                 <button
                   type="button"
                   className="btn btn-primary text-xs"
-                  disabled={saving === p.paperId}
+                  disabled={saving === p.id}
                   onClick={() => savePaper(p)}
                 >
-                  {saving === p.paperId ? "Saving…" : "+ Save to brain"}
+                  {saving === p.id ? "Saving…" : "+ Save to brain"}
                 </button>
                 {p.url && (
                   <a href={p.url} target="_blank" rel="noreferrer" className="btn text-xs">
@@ -220,7 +222,7 @@ export function RelatedReadingPanel({ brainId }: { brainId: string }) {
 
       {!loading && papers.length === 0 && !error && (
         <p className="text-xs text-[var(--color-muted)]">
-          No paper results right now — your concepts may be too niche, or Semantic Scholar rate-limited. Try capturing more text first.
+          No paper results right now — try capturing more text or a DOI first.
         </p>
       )}
     </div>
