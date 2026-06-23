@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   title: "Learn Anything",
   description: "A privacy-first second brain that teaches you.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Learn Anything" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Learn Anything" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0d12",
+  themeColor: "#f7f4ef",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

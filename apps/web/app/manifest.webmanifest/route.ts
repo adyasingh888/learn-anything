@@ -8,8 +8,8 @@ export function GET() {
     description: "A privacy-first second brain that teaches you.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0b0d12",
-    theme_color: "#0b0d12",
+    background_color: "#f7f4ef",
+    theme_color: "#f7f4ef",
     orientation: "portrait-primary",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
     share_target: {

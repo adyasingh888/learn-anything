@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { DOMAIN_CATALOG, getMode } from "@learn-anything/core";
+import { getDomainInfo, getMode } from "@learn-anything/core";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
 import { dueCount, useBrain } from "@/lib/store";
@@ -39,7 +39,7 @@ function Inner({ brainId }: { brainId: string }) {
   }
 
   const mode = getMode(brain.modeId, brain.domainType);
-  const domain = DOMAIN_CATALOG.find((d) => d.type === brain.domainType);
+  const domain = getDomainInfo(brain.domainType);
   const due = dueCount(cards);
 
   const tabs: { id: Tab; label: string }[] = [
@@ -73,8 +73,8 @@ function Inner({ brainId }: { brainId: string }) {
             onClick={() => setTab(t.id)}
             className={`whitespace-nowrap rounded-t-lg px-3 py-2 text-sm font-medium transition ${
               tab === t.id
-                ? "border-b-2 border-[var(--color-accent)] text-white"
-                : "text-[var(--color-muted)] hover:text-white"
+                ? "border-b-2 border-[var(--color-accent)] text-[var(--color-text)]"
+                : "text-[var(--color-muted)] hover:text-[var(--color-text-secondary)]"
             }`}
           >
             {t.label}

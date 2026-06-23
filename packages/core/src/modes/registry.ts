@@ -94,7 +94,7 @@ export const MODES: Record<string, LearningMode> = {
   "research-scholar": {
     id: "research-scholar",
     name: "Research & Scholar",
-    tagline: "Map the literature, challenge claims, find the gaps, write.",
+    tagline: "Dissertation, lit review, assignments, viva — map sources, challenge claims, write.",
     domainTypes: ["research"],
     loopStages: {
       distill: ["summarize", "atomize", "lit-synthesis"],
