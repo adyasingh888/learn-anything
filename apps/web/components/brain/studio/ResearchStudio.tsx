@@ -1,8 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   HashingEmbedder,
   buildGroundedPrompt,
+  extractClaims,
+  generateVivaQuestions,
   gradeQuality,
   makeArtifact,
   retrieve,
@@ -20,6 +22,9 @@ export function ResearchStudio({ brainId }: { brainId: string }) {
   const [busy, setBusy] = useState(false);
 
   const allowCloud = brain?.privacy.aiProcessing === "cloud" && brain.privacy.allowCloudGeneration;
+  const vivaQs = useMemo(() => generateVivaQuestions(atoms, sources, 6), [atoms, sources]);
+  const claims = useMemo(() => extractClaims(atoms, sources), [atoms, sources]);
+  const evidenceLinks = claims.reduce((s, c) => s + c.evidence.length, 0);
 
   const synthesize = async () => {
     const q = topic.trim() || "the central themes across these sources";
@@ -44,6 +49,12 @@ export function ResearchStudio({ brainId }: { brainId: string }) {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="chip">{claims.length} claims mapped</span>
+        <span className="chip">{evidenceLinks} evidence links</span>
+        <span className="chip">{sources.length} sources</span>
+      </div>
+
       <div className="card-surface rounded-2xl p-4">
         <h3 className="text-sm font-semibold">Literature synthesis</h3>
         <p className="mt-0.5 text-xs text-[var(--color-muted)]">
@@ -61,6 +72,18 @@ export function ResearchStudio({ brainId }: { brainId: string }) {
           </button>
         </div>
       </div>
+
+      {vivaQs.length > 0 && (
+        <div className="card-surface rounded-2xl p-4">
+          <h3 className="text-sm font-semibold">Viva prep</h3>
+          <p className="mt-0.5 text-xs text-[var(--color-muted)]">Practice answering these aloud — grounded in your captures.</p>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
+            {vivaQs.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       <div className="space-y-3">
         {artifacts

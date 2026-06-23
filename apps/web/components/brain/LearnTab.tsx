@@ -2,8 +2,10 @@
 import { useMemo, useState } from "react";
 import {
   buildSession,
+  buildWeaknessSession,
   createScheduler,
   getMode,
+  getWeakCardIds,
   nextObjective,
   previewIntervals,
   type Card,
@@ -22,7 +24,7 @@ const GRADES: { grade: ReviewGrade; label: string; tone: string }[] = [
 const OPEN_KINDS: CardKind[] = ["free-recall", "teach-back", "problem", "speak", "produce"];
 
 export function LearnTab({ brainId }: { brainId: string }) {
-  const { brain, cards, objectives, mastery } = useBrain(brainId);
+  const { brain, cards, objectives, mastery, activities } = useBrain(brainId);
   const { gradeCard } = useStore();
   const [sessionIds, setSessionIds] = useState<string[] | null>(null);
   const [idx, setIdx] = useState(0);
@@ -43,8 +45,20 @@ export function LearnTab({ brainId }: { brainId: string }) {
     return sessionIds.map((id) => cards.find((c) => c.id === id)).filter(Boolean) as Card[];
   }, [sessionIds, cards]);
 
+  const weakCount = getWeakCardIds(activities, brainId).length;
+
   const startSession = () => {
     const session = buildSession(cards, { mode, limit: 20 });
+    if (!session.length) return;
+    setSessionIds(session.map((c) => c.id));
+    setIdx(0);
+    setRevealed(false);
+    setSelfAnswer("");
+    setDone(0);
+  };
+
+  const startWeakSession = () => {
+    const session = buildWeaknessSession(cards, activities, brainId, { mode, limit: 20 });
     if (!session.length) return;
     setSessionIds(session.map((c) => c.id));
     setIdx(0);
@@ -86,9 +100,16 @@ export function LearnTab({ brainId }: { brainId: string }) {
         {currentObjective && (
           <p className="mt-2 text-xs text-[var(--color-accent)]">Current objective: {currentObjective.title}</p>
         )}
-        <button className="btn btn-primary mx-auto mt-4" onClick={startSession} disabled={dueNow === 0}>
-          {dueNow === 0 ? "All caught up 🎉" : "Start review"}
-        </button>
+        <div className="mx-auto mt-4 flex flex-wrap justify-center gap-2">
+          <button className="btn btn-primary" onClick={startSession} disabled={dueNow === 0}>
+            {dueNow === 0 ? "All caught up 🎉" : "Start review"}
+          </button>
+          {weakCount > 0 && (
+            <button className="btn" onClick={startWeakSession}>
+              Drill {weakCount} weak
+            </button>
+          )}
+        </div>
       </div>
     );
   }

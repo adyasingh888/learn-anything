@@ -11,6 +11,7 @@ import { GraphTab } from "./GraphTab";
 import { LearnTab } from "./LearnTab";
 import { TutorTab } from "./TutorTab";
 import { StudioTab } from "./StudioTab";
+import { DomainQuickActions } from "./DomainQuickActions";
 import { BrainSettings } from "./BrainSettings";
 
 type Tab = "sources" | "graph" | "learn" | "tutor" | "studio" | "settings";
@@ -96,6 +97,7 @@ function Inner({ brainId }: { brainId: string }) {
       {brain.goal && (
         <p className="mt-2 text-sm text-[var(--color-muted)]">🎯 {brain.goal}</p>
       )}
+      <DomainQuickActions brainId={brainId} domain={brain.domainType} />
       {avgMastery != null && objectives.length > 0 && (
         <p className="mt-1 text-xs text-[var(--color-accent)]">
           Mastery: {avgMastery}% across {objectives.length} objective{objectives.length === 1 ? "" : "s"}

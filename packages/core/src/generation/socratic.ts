@@ -14,6 +14,7 @@ export function socraticTurn(
   question: string,
   context: string,
   userAnswer?: string,
+  priorTurns: { role: "user" | "assistant"; content: string }[] = [],
 ): SocraticTurn {
   if (!context || context.length < 40) {
     return {
@@ -30,7 +31,7 @@ export function socraticTurn(
     .filter((s) => s.length > 30 && s.length < 280);
 
   if (!userAnswer?.trim()) {
-    const probe = buildProbe(question, keys, sentences);
+    const probe = buildProbe(question, keys, sentences, priorTurns);
     return { content: probe, expectsAnswer: true };
   }
 
@@ -42,7 +43,7 @@ export function socraticTurn(
         "",
         `**Hint:** Look for material about **${keys[0] ?? "the core idea"}**.`,
         "",
-        buildProbe(question, keys.slice(1), sentences),
+        buildProbe(question, keys.slice(1), sentences, priorTurns),
       ].join("\n"),
       expectsAnswer: true,
     };
@@ -73,7 +74,16 @@ export function socraticTurn(
   };
 }
 
-function buildProbe(question: string, keys: string[], sentences: string[]): string {
+function buildProbe(
+  question: string,
+  keys: string[],
+  sentences: string[],
+  prior: { role: string; content: string }[],
+): string {
+  const askedBefore = prior.filter((p) => p.role === "assistant").length;
+  if (askedBefore >= 2) {
+    return `**Synthesis:** You've answered ${askedBefore} probes. State your overall conclusion about **${keys[0] ?? "this topic"}** in 2–3 sentences.`;
+  }
   const key = keys[0] ?? "the main concept";
   const qLower = question.toLowerCase();
   if (/gap|missing|what should/.test(qLower)) {

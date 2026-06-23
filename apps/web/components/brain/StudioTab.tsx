@@ -10,6 +10,7 @@ import { LanguageStudio } from "./studio/LanguageStudio";
 import { ExamStudio } from "./studio/ExamStudio";
 import { ResearchStudio } from "./studio/ResearchStudio";
 import { TeachBackStudio } from "./studio/TeachBackStudio";
+import { FreeRecallStudio } from "./studio/FreeRecallStudio";
 
 export function StudioTab({ brainId }: { brainId: string }) {
   const { brain } = useBrain(brainId);
@@ -31,6 +32,9 @@ export function StudioTab({ brainId }: { brainId: string }) {
       return <MemoryStudio brainId={brainId} />;
     case "project":
       return <ProjectStudio brainId={brainId} />;
+    case "general":
+    case "concept":
+      return <FreeRecallStudio brainId={brainId} />;
     default:
       return <TeachBackStudio brainId={brainId} />;
   }

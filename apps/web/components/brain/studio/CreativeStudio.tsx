@@ -25,6 +25,8 @@ export function CreativeStudio({ brainId }: { brainId: string }) {
     return [...fromSources, ...fromAtoms].slice(0, 20);
   }, [sources, atoms]);
 
+  const pickRandom = () => setExemplarIdx(Math.floor(Math.random() * exemplars.length));
+
   const exemplar = exemplars[exemplarIdx];
   const score = RUBRIC.filter((r) => checks[r.id]).length / RUBRIC.length;
 
@@ -65,9 +67,14 @@ export function CreativeStudio({ brainId }: { brainId: string }) {
         <div className="card-surface rounded-2xl p-4">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-semibold">Exemplar</h4>
-            <button type="button" className="btn text-xs" onClick={() => setExemplarIdx((i) => (i + 1) % exemplars.length)}>
-              Next →
-            </button>
+            <div className="flex gap-1">
+              <button type="button" className="btn text-xs" onClick={pickRandom} title="Random exemplar">
+                Shuffle
+              </button>
+              <button type="button" className="btn text-xs" onClick={() => setExemplarIdx((i) => (i + 1) % exemplars.length)}>
+                Next →
+              </button>
+            </div>
           </div>
           <p className="mt-2 font-medium">{exemplar.title}</p>
           <p className="mt-2 max-h-48 overflow-y-auto text-sm text-[var(--color-text-secondary)]">{exemplar.text}</p>

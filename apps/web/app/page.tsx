@@ -6,6 +6,8 @@ import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
 import { NewBrainModal } from "@/components/NewBrainModal";
 import { ResurfacePanel } from "@/components/ResurfacePanel";
+import { ReviewBanner } from "@/components/ReviewBanner";
+import { ReviewReminders } from "@/components/ReviewReminders";
 import { FeatureTips } from "@/components/FeatureTips";
 import { dueCount, useStore } from "@/lib/store";
 
@@ -39,6 +41,9 @@ function Dashboard() {
       </div>
 
       {creating && <NewBrainModal onClose={() => setCreating(false)} />}
+
+      <ReviewBanner />
+      <ReviewReminders />
 
       {db.brains.length === 0 && !creating ? (
         <EmptyState onCreate={() => setCreating(true)} />

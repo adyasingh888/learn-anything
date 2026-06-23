@@ -51,7 +51,8 @@ export function TutorTab({ brainId }: { brainId: string }) {
 
       if (useSocratic) {
         const priorAnswer = awaitingAnswer ? q : undefined;
-        const turn = socraticTurn(lastQuestionRef.current || q, context, priorAnswer);
+        const priorTurns = messages.map((m) => ({ role: m.role, content: m.content }));
+        const turn = socraticTurn(lastQuestionRef.current || q, context, priorAnswer, priorTurns);
         lastQuestionRef.current = q;
         setAwaitingAnswer(turn.expectsAnswer);
         setMessages((m) => [

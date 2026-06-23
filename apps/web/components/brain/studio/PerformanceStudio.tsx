@@ -6,6 +6,7 @@ import { useRecorder } from "../StudioTab";
 export function PerformanceStudio({ brainId }: { brainId: string }) {
   const { logActivity } = useStore();
   const rec = useRecorder();
+  const [targetBpm, setTargetBpm] = useState(80);
   const [bpm, setBpm] = useState(80);
   const [playing, setPlaying] = useState(false);
   const [note, setNote] = useState<string>("—");
@@ -102,10 +103,26 @@ export function PerformanceStudio({ brainId }: { brainId: string }) {
           type="range"
           min={40}
           max={208}
-          value={bpm}
-          onChange={(e) => setBpm(Number(e.target.value))}
+          value={targetBpm}
+          onChange={(e) => {
+            const t = Number(e.target.value);
+            setTargetBpm(t);
+            setBpm(t);
+          }}
           className="mt-3 w-full accent-[var(--color-accent)]"
         />
+        <div className="mt-2 flex flex-wrap gap-2">
+          {[0.5, 0.75, 1].map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              className="btn text-xs"
+              onClick={() => setBpm(Math.round(targetBpm * pct))}
+            >
+              {Math.round(pct * 100)}% ({Math.round(targetBpm * pct)} bpm)
+            </button>
+          ))}
+        </div>
         <button className={`btn mt-3 ${playing ? "" : "btn-primary"}`} onClick={toggleMetro}>
           {playing ? "⏹ Stop" : "▶ Start"}
         </button>

@@ -1,15 +1,19 @@
 /**
  * Export a brain slice as readable Markdown — portable, no keys.
  */
-import type { Atom, Brain, Card, Edge, Objective, Source } from "../types.js";
+import type { Atom, Artifact, Brain, Card, Concept, Edge, MasteryState, Objective, Path, Source } from "../types.js";
 
 export interface BrainExportSlice {
   brain?: Brain;
   sources?: Source[];
   atoms?: Atom[];
+  concepts?: Concept[];
   edges?: Edge[];
   cards?: Card[];
   objectives?: Objective[];
+  mastery?: MasteryState[];
+  paths?: Path[];
+  artifacts?: Artifact[];
 }
 
 export function brainToMarkdown(slice: BrainExportSlice): string {

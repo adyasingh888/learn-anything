@@ -36,11 +36,17 @@ import {
   upsertConcept,
   objectivesFromGoal,
   brainToMarkdown,
+  importBrainPack,
+  mineVocab,
+  vocabToCards,
+  suggestMnemonics,
+  mnemonicsToCards,
   pathFromObjectives,
   type Activity,
   type Artifact,
   type Atom,
   type Brain,
+  type BrainExportSlice,
   type Card,
   type Concept,
   type DomainType,
@@ -102,6 +108,7 @@ interface StoreContext {
   disableEncryption: () => void;
   exportVault: () => string;
   importVault: (json: string, mode?: "merge" | "replace") => boolean;
+  importBrain: (json: string) => Brain | null;
   exportBrain: (brainId: string) => string;
   exportBrainMarkdown: (brainId: string) => string;
   enrichSourceText: (sourceId: string) => Promise<boolean>;
@@ -127,6 +134,8 @@ interface StoreContext {
   pruneSameSourceEdges: (brainId: string) => void;
   // generation
   generateCardsFromSource: (sourceId: string) => Promise<Card[]>;
+  generateVocabCards: (brainId: string) => Promise<Card[]>;
+  generateMnemonicCards: (brainId: string) => Promise<Card[]>;
   setCardSuspended: (cardId: string, suspended: boolean) => void;
   // review
   gradeCard: (cardId: string, grade: ReviewGrade) => void;
@@ -345,6 +354,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return true;
       } catch {
         return false;
+      }
+    },
+    [commit],
+  );
+
+  const importBrain = useCallback(
+    (json: string) => {
+      try {
+        const slice = JSON.parse(json) as BrainExportSlice;
+        const pack = importBrainPack(slice);
+        if (!pack) return null;
+        commit((p) => ({
+          ...p,
+          brains: [...p.brains, pack.brain],
+          sources: [...p.sources, ...pack.sources],
+          atoms: [...p.atoms, ...pack.atoms],
+          concepts: [...p.concepts, ...pack.concepts],
+          edges: [...p.edges, ...pack.edges],
+          cards: [...p.cards, ...pack.cards],
+          objectives: [...p.objectives, ...pack.objectives],
+          mastery: [...p.mastery, ...pack.mastery],
+          paths: [...p.paths, ...pack.paths],
+          artifacts: [...p.artifacts, ...pack.artifacts],
+        }));
+        return pack.brain;
+      } catch {
+        return null;
       }
     },
     [commit],
@@ -698,6 +734,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [db.sources, db.brains, commit],
   );
 
+  const generateVocabCards = useCallback(
+    async (brainId: string) => {
+      const sources = db.sources.filter((s) => s.brainId === brainId);
+      const items = mineVocab(sources, 20);
+      const cards = vocabToCards(brainId, items, sources.map((s) => s.id));
+      if (cards.length) commit((p) => ({ ...p, cards: [...p.cards, ...cards] }));
+      return cards;
+    },
+    [db.sources, commit],
+  );
+
+  const generateMnemonicCards = useCallback(
+    async (brainId: string) => {
+      const atoms = db.atoms.filter((a) => a.brainId === brainId);
+      const suggestions = suggestMnemonics(atoms, 8);
+      const cards = mnemonicsToCards(brainId, suggestions, atoms);
+      if (cards.length) commit((p) => ({ ...p, cards: [...p.cards, ...cards] }));
+      return cards;
+    },
+    [db.atoms, commit],
+  );
+
   // ---- Review ----
   const gradeCard = useCallback(
     (cardId: string, grade: ReviewGrade) => {
@@ -785,6 +843,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       disableEncryption,
       exportVault,
       importVault,
+      importBrain,
       exportBrain,
       exportBrainMarkdown,
       enrichSourceText,
@@ -801,6 +860,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addTypedEdge,
       pruneSameSourceEdges,
       generateCardsFromSource,
+      generateVocabCards,
+      generateMnemonicCards,
       setCardSuspended,
       gradeCard,
       logActivity,
@@ -817,6 +878,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       disableEncryption,
       exportVault,
       importVault,
+      importBrain,
       exportBrain,
       exportBrainMarkdown,
       enrichSourceText,
@@ -833,6 +895,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addTypedEdge,
       pruneSameSourceEdges,
       generateCardsFromSource,
+      generateVocabCards,
+      generateMnemonicCards,
       setCardSuspended,
       gradeCard,
       logActivity,

@@ -35,7 +35,12 @@ Everything below works **without** `LLM_API_KEY`, OpenAI, or paid subscriptions.
 | Curriculum path | Objectives sequenced with deadline pacing |
 | Per-brain export | Settings → JSON or Markdown download |
 | Memory palace | Memory brains → palace rooms + mnemonics |
-| Project milestones | Project brains → pacing + weekly reflection |
+| Mnemonic cards | Memory studio → auto cloze from mnemonic hooks |
+| Free recall + graded reader | General/concept studio → offline recall grading |
+| Project milestones | Project brains → pacing + weekly reflection + activity log |
+| Brain import | Settings or brain Settings → JSON pack |
+| Review reminders | Settings → browser notifications when cards due |
+| Semantic search | ⌘K merges keyword + on-device embeddings |
 | PWA + extension | Install on phone; Chrome capture extension |
 
 ## Free external APIs we use (server-side, no user key)

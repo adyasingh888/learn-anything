@@ -2,7 +2,9 @@
  * Heuristic mnemonics from atoms — no LLM.
  */
 import { extractKeyphrases } from "../ingest/index.js";
-import type { Atom } from "../types.js";
+import type { Atom, Card } from "../types.js";
+import { newCardState } from "../srs/fsrs.js";
+import { newId, now } from "../ids.js";
 
 export interface MnemonicSuggestion {
   atomId: string;
@@ -37,4 +39,24 @@ export function memoryPalaceRooms(atoms: Atom[]): { room: number; label: string;
     rooms.push({ room: Math.floor(i / chunk) + 1, label, atoms: slice });
   }
   return rooms.slice(0, 8);
+}
+
+export function mnemonicsToCards(brainId: string, suggestions: MnemonicSuggestion[], atoms: Atom[]): Card[] {
+  return suggestions.slice(0, 12).map((m) => {
+    const atom = atoms.find((a) => a.id === m.atomId);
+    const hook = [m.acronym ? `Acronym: ${m.acronym}` : "", m.imageHook, m.rhyme].filter(Boolean).join("\n");
+    return {
+      id: newId("card"),
+      brainId,
+      kind: "cloze" as const,
+      bloom: "remember" as const,
+      front: `Memory hook for: ${m.fact}`,
+      back: `${atom?.body.slice(0, 240) ?? m.fact}\n\n${hook}`,
+      atomIds: [m.atomId],
+      sourceIds: atom?.sourceIds ?? [],
+      conceptIds: atom?.conceptIds ?? [],
+      fsrs: newCardState(),
+      createdAt: now(),
+    };
+  });
 }

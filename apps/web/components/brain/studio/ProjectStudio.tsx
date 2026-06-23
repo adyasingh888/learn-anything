@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { computePacing, isMastered, nextObjective } from "@learn-anything/core";
+import { computePacing, isMastered, milestoneActivitySummary, nextObjective } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 
 export function ProjectStudio({ brainId }: { brainId: string }) {
@@ -12,6 +12,7 @@ export function ProjectStudio({ brainId }: { brainId: string }) {
   const masteryMap = useMemo(() => new Map(mastery.map((m) => [m.objectiveId, m])), [mastery]);
   const current = useMemo(() => nextObjective(objectives, masteryMap), [objectives, masteryMap]);
   const pacing = useMemo(() => computePacing(brain?.deadline, objectives, mastery), [brain?.deadline, objectives, mastery]);
+  const milestoneLog = useMemo(() => milestoneActivitySummary(objectives, activities), [objectives, activities]);
 
   const recentWork = activities
     .filter((a) => ["tutor", "teach-back", "mock-exam", "review", "critique", "code"].includes(a.kind))
@@ -24,6 +25,7 @@ export function ProjectStudio({ brainId }: { brainId: string }) {
       brainId,
       kind: "project",
       score: 0.8,
+      objectiveId: current?.id,
       payload: { reflection: reflection.trim() },
     });
     setReflection("");
@@ -68,6 +70,16 @@ export function ProjectStudio({ brainId }: { brainId: string }) {
                   <span className="text-xs text-[var(--color-muted)]">Milestone {i + 1}</span>
                   <p className="font-medium">{done ? "✓ " : active ? "→ " : ""}{o.title}</p>
                   <p className="text-xs text-[var(--color-muted)]">{Math.round((m?.mastery ?? 0) * 100)}% mastery</p>
+                  {(() => {
+                    const log = milestoneLog.find((x) => x.objectiveId === o.id);
+                    if (!log?.activityCount) return null;
+                    return (
+                      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                        {log.activityCount} logged · {log.kinds.join(", ")}
+                        {log.avgScore != null ? ` · avg ${Math.round(log.avgScore * 100)}%` : ""}
+                      </p>
+                    );
+                  })()}
                 </li>
               );
             })}

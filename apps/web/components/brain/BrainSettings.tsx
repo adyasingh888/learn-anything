@@ -1,12 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { allModes, getMode } from "@learn-anything/core";
-import { isMastered, MASTERY_THRESHOLD, nextObjective } from "@learn-anything/core";
+import { allModes, getMode, isMastered, MASTERY_THRESHOLD, nextObjective } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 
 export function BrainSettings({ brainId }: { brainId: string }) {
   const { brain, objectives, mastery, paths } = useBrain(brainId);
-  const { updateBrain, deleteBrain, exportBrain, exportBrainMarkdown } = useStore();
+  const { updateBrain, deleteBrain, exportBrain, exportBrainMarkdown, importBrain } = useStore();
   const router = useRouter();
   if (!brain) return null;
 
@@ -115,6 +114,25 @@ export function BrainSettings({ brainId }: { brainId: string }) {
             ⬇ Markdown
           </button>
         </div>
+      </div>
+
+      <div className="card-surface rounded-2xl p-4">
+        <h3 className="text-sm font-semibold">Import brain pack</h3>
+        <p className="mt-0.5 text-xs text-[var(--color-muted)]">Import a JSON export from another device as a new brain.</p>
+        <label className="btn mt-3 cursor-pointer">
+          ⬆ Import JSON
+          <input
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const brain = importBrain(await file.text());
+              if (brain) router.push(`/brain/${brain.id}`);
+            }}
+          />
+        </label>
       </div>
 
       <div className="card-surface rounded-2xl p-4">

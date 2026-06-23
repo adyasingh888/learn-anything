@@ -1,19 +1,23 @@
 "use client";
 import { useMemo, useState } from "react";
+import { mineVocab } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 import { useRecorder } from "../StudioTab";
 
-type Mode = "speak" | "listen";
+type Mode = "speak" | "listen" | "vocab";
 
 export function LanguageStudio({ brainId }: { brainId: string }) {
   const { cards, atoms, sources } = useBrain(brainId);
-  const { logActivity } = useStore();
+  const { logActivity, generateVocabCards } = useStore();
   const rec = useRecorder();
   const [mode, setMode] = useState<Mode>("speak");
   const [idx, setIdx] = useState(0);
   const [heard, setHeard] = useState(false);
   const [typed, setTyped] = useState("");
   const [checked, setChecked] = useState<boolean | null>(null);
+  const [mining, setMining] = useState(false);
+
+  const vocab = useMemo(() => mineVocab(sources, 16), [sources]);
 
   const prompts = useMemo(() => {
     const fromCards = cards.map((c) => c.back || c.front);
@@ -50,26 +54,55 @@ export function LanguageStudio({ brainId }: { brainId: string }) {
     setChecked(null);
   };
 
-  if (prompts.length === 0) {
+  if (prompts.length === 0 && vocab.length === 0) {
     return (
       <div className="card-surface rounded-2xl p-8 text-center text-sm text-[var(--color-muted)]">
-        Capture some text or generate cards first — speaking practice is built from your material.
+        Capture some text first — speaking and vocab mining need source material.
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button type="button" className={`btn text-sm ${mode === "speak" ? "btn-primary" : ""}`} onClick={() => setMode("speak")}>
           Shadowing
         </button>
         <button type="button" className={`btn text-sm ${mode === "listen" ? "btn-primary" : ""}`} onClick={() => setMode("listen")}>
           Listen & type
         </button>
+        <button type="button" className={`btn text-sm ${mode === "vocab" ? "btn-primary" : ""}`} onClick={() => setMode("vocab")}>
+          Vocab ({vocab.length})
+        </button>
       </div>
 
-      {mode === "speak" ? (
+      {mode === "vocab" ? (
+        <div className="card-surface rounded-2xl p-4">
+          <h4 className="text-sm font-semibold">Mined vocabulary</h4>
+          <p className="mt-1 text-xs text-[var(--color-muted)]">From your sources — turn into cloze cards for Learn.</p>
+          <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto text-sm">
+            {vocab.map((v) => (
+              <li key={v.term} className="flex justify-between gap-2">
+                <span className="font-medium">{v.term}</span>
+                <span className="truncate text-xs text-[var(--color-muted)]">{v.context.slice(0, 50)}…</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="btn btn-primary mt-4"
+            disabled={mining || !vocab.length}
+            onClick={async () => {
+              setMining(true);
+              const made = await generateVocabCards(brainId);
+              setMining(false);
+              logActivity({ brainId, kind: "practice", score: 1, payload: { vocabCards: made.length } });
+            }}
+          >
+            {mining ? "Creating…" : `Create ${Math.min(vocab.length, 15)} cloze cards → Learn`}
+          </button>
+        </div>
+      ) : mode === "speak" ? (
         <div className="card-surface rounded-2xl p-6 text-center">
           <p className="text-xs text-[var(--color-muted)]">Prompt {idx + 1} / {prompts.length}</p>
           <p className="mt-2 text-xl">{phrase}</p>

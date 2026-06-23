@@ -61,13 +61,17 @@ export function ExamStudio({ brainId }: { brainId: string }) {
 
   const finishExam = (next: Answer[]) => {
     const score = next.filter((a) => a.correct).length / next.length;
-    logActivity({
-      brainId,
-      kind: "mock-exam",
-      score,
-      objectiveId: applyObjective,
-      payload: { total: next.length, drill: drillMode },
-    });
+      logActivity({
+        brainId,
+        kind: "mock-exam",
+        score,
+        objectiveId: applyObjective,
+        payload: {
+          total: next.length,
+          drill: drillMode,
+          wrongCardIds: next.filter((a) => !a.correct).map((a) => a.card.id),
+        },
+      });
     for (const a of next.filter((x) => !x.correct)) {
       setCardSuspended(a.card.id, false);
     }

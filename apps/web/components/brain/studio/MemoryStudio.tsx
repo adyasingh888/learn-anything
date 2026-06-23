@@ -1,11 +1,12 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { memoryPalaceRooms, suggestMnemonics } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 
 export function MemoryStudio({ brainId }: { brainId: string }) {
   const { atoms, cards } = useBrain(brainId);
-  const { logActivity } = useStore();
+  const { logActivity, generateMnemonicCards } = useStore();
+  const [making, setMaking] = useState(false);
 
   const rooms = useMemo(() => memoryPalaceRooms(atoms), [atoms]);
   const mnemonics = useMemo(() => suggestMnemonics(atoms, 6), [atoms]);
@@ -53,6 +54,18 @@ export function MemoryStudio({ brainId }: { brainId: string }) {
         <button
           type="button"
           className="btn btn-primary mt-4"
+          disabled={making}
+          onClick={async () => {
+            setMaking(true);
+            await generateMnemonicCards(brainId);
+            setMaking(false);
+          }}
+        >
+          {making ? "Generating…" : "Generate mnemonic cards → Learn"}
+        </button>
+        <button
+          type="button"
+          className="btn mt-2"
           onClick={() => logActivity({ brainId, kind: "practice", score: 1, payload: { memoryPalace: true } })}
         >
           Log palace walk ✓

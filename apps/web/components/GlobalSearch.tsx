@@ -1,14 +1,17 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { searchVault } from "@learn-anything/core";
+import { HashingEmbedder, searchVault, searchVaultSemantic } from "@learn-anything/core";
 import { useStore } from "@/lib/store";
+
+const embedder = new HashingEmbedder(256);
 
 export function GlobalSearch() {
   const { db } = useStore();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
+  const [semanticHits, setSemanticHits] = useState<ReturnType<typeof searchVault> | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -22,7 +25,21 @@ export function GlobalSearch() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const hits = q.length >= 2 ? searchVault(db.brains, db.sources, db.atoms, db.cards, q, 16) : [];
+  useEffect(() => {
+    if (q.length < 2) {
+      setSemanticHits(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      void searchVaultSemantic(embedder, db.brains, db.sources, db.atoms, db.cards, q, 16).then(setSemanticHits);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [q, db.brains, db.sources, db.atoms, db.cards]);
+
+  const hits = useMemo(() => {
+    if (q.length < 2) return [];
+    return semanticHits ?? searchVault(db.brains, db.sources, db.atoms, db.cards, q, 16);
+  }, [q, semanticHits, db]);
 
   useEffect(() => {
     setActiveIdx(0);
@@ -51,14 +68,11 @@ export function GlobalSearch() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[12vh]" onClick={() => setOpen(false)}>
-      <div
-        className="card-surface w-full max-w-lg rounded-2xl p-3 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="card-surface w-full max-w-lg rounded-2xl p-3 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <input
           className="input"
           autoFocus
-          placeholder="Search brains, sources, atoms, cards…"
+          placeholder="Search brains, sources, atoms, cards… (semantic)"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKeyDown}
@@ -67,7 +81,7 @@ export function GlobalSearch() {
           {q.length < 2 && (
             <div className="px-2 py-4 text-center text-xs text-[var(--color-muted)]">
               <p>Type 2+ characters</p>
-              <p className="mt-2">↑↓ navigate · Enter open · Esc close</p>
+              <p className="mt-2">Uses on-device embeddings + keywords</p>
             </div>
           )}
           {q.length >= 2 && hits.length === 0 && (

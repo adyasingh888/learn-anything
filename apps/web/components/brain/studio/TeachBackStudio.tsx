@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { HashingEmbedder, buildGroundedPrompt, retrieve } from "@learn-anything/core";
+import { HashingEmbedder, buildGroundedPrompt, gradeTeachBack, retrieve } from "@learn-anything/core";
 import { useBrain, useStore } from "@/lib/store";
 import { getProvider } from "@/lib/llm";
 
@@ -12,6 +12,7 @@ export function TeachBackStudio({ brainId }: { brainId: string }) {
   const [target, setTarget] = useState("");
   const [explanation, setExplanation] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [score, setScore] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
   const topics = useMemo(
@@ -26,15 +27,29 @@ export function TeachBackStudio({ brainId }: { brainId: string }) {
     setBusy(true);
     try {
       const ctx = await retrieve(target || explanation, { embedder, atoms, sources, k: 5 });
-      const provider = getProvider({ allowCloud: !!allowCloud });
+      const context = ctx.promptContext || atoms.map((a) => a.body).join("\n");
+
+      if (!allowCloud) {
+        const g = gradeTeachBack(target || "this topic", explanation, context);
+        setScore(g.score);
+        setFeedback(
+          [g.summary, "", g.gotRight.length ? `**Got right:** ${g.gotRight.join(", ")}` : "", g.gaps.length ? `**Gaps:** ${g.gaps.join(", ")}` : "", `**Next:** ${g.question}`]
+            .filter(Boolean)
+            .join("\n"),
+        );
+        logActivity({ brainId, kind: "teach-back", score: g.score });
+        return;
+      }
+
+      const provider = getProvider({ allowCloud: true });
       const prompt = buildGroundedPrompt(
         `The learner is using the Feynman technique to explain "${target || "this topic"}". Their explanation:\n"""${explanation}"""\n\nUsing ONLY the context, point out (1) what they got right, (2) gaps or errors, and (3) one question to deepen understanding. Be concise and encouraging.`,
-        ctx.promptContext || "(no captured context yet)",
+        context || "(no captured context yet)",
         { persona: "You are a supportive tutor applying the Feynman technique." },
       );
       const text = await provider.complete(prompt);
       setFeedback(text);
-      logActivity({ brainId, kind: "teach-back" });
+      logActivity({ brainId, kind: "teach-back", score: 0.75 });
     } finally {
       setBusy(false);
     }
@@ -43,7 +58,7 @@ export function TeachBackStudio({ brainId }: { brainId: string }) {
   return (
     <div className="space-y-5">
       <p className="text-sm text-[var(--color-muted)]">
-        The fastest way to find the holes in your understanding: explain it simply, as if teaching a beginner.
+        Explain it simply — offline grading checks your explanation against captured material.
       </p>
 
       {topics.length > 0 && (
@@ -51,7 +66,8 @@ export function TeachBackStudio({ brainId }: { brainId: string }) {
           {topics.map((t) => (
             <button
               key={t}
-              className={`chip ${target === t ? "border-[var(--color-accent)] text-white" : ""}`}
+              type="button"
+              className={`chip ${target === t ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white" : ""}`}
               onClick={() => setTarget(t)}
             >
               {t}
@@ -73,14 +89,17 @@ export function TeachBackStudio({ brainId }: { brainId: string }) {
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
         />
-        <button className="btn btn-primary mt-3" onClick={grade} disabled={busy || !explanation.trim()}>
+        <button type="button" className="btn btn-primary mt-3" onClick={grade} disabled={busy || !explanation.trim()}>
           {busy ? "Reviewing…" : "Check my understanding"}
         </button>
       </div>
 
       {feedback && (
         <div className="card-surface rounded-2xl p-4">
-          <h4 className="text-sm font-semibold">Feedback</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold">Feedback</h4>
+            {score != null && <span className="chip">{Math.round(score * 100)}% match</span>}
+          </div>
           <p className="mt-2 whitespace-pre-wrap text-sm">{feedback}</p>
         </div>
       )}

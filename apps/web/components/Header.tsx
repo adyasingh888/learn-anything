@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { QuickCapture } from "@/components/QuickCapture";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { useStore } from "@/lib/store";
 
@@ -15,6 +16,7 @@ export function Header() {
           <span className="page-title text-lg font-bold text-[var(--color-text)]">Learn Anything</span>
         </Link>
         <div className="flex items-center gap-2">
+          <QuickCapture />
           <GlobalSearch />
           <span className="chip" title={meta.encrypted ? "End-to-end encrypted" : "Stored locally on this device"}>
             {meta.encrypted ? "🔒 Encrypted" : "📱 Local"}

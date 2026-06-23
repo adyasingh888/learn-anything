@@ -1,7 +1,9 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Gate } from "@/components/Gate";
 import { Header } from "@/components/Header";
+import { ReviewReminderToggle } from "@/components/ReviewReminders";
 import { useStore } from "@/lib/store";
 
 export default function SettingsPage() {
@@ -21,6 +23,7 @@ export default function SettingsPage() {
         </section>
         <Privacy />
         <DataSection />
+        <BrainImportSection />
       </main>
     </Gate>
   );
@@ -117,6 +120,40 @@ function DataSection() {
           <input type="file" accept="application/json,.json" hidden onChange={(e) => onImport(e.target.files?.[0])} />
         </label>
       </div>
+      {msg && <p className="mt-2 text-xs text-[var(--color-accent-2)]">{msg}</p>}
+      <div className="mt-3">
+        <ReviewReminderToggle />
+      </div>
+    </section>
+  );
+}
+
+function BrainImportSection() {
+  const { importBrain } = useStore();
+  const router = useRouter();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const onImport = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const brain = importBrain(await file.text());
+      setMsg(brain ? `Imported “${brain.name}”.` : "Invalid brain pack JSON.");
+      if (brain) router.push(`/brain/${brain.id}`);
+    } catch {
+      setMsg("Could not read file.");
+    }
+  };
+
+  return (
+    <section className="card-surface mt-5 rounded-2xl p-4">
+      <h2 className="text-sm font-semibold">Import a brain</h2>
+      <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+        Import a per-brain JSON export as a new workspace (IDs are remapped).
+      </p>
+      <label className="btn mt-3 cursor-pointer">
+        ⬆ Import brain JSON
+        <input type="file" accept="application/json,.json" hidden onChange={(e) => onImport(e.target.files?.[0])} />
+      </label>
       {msg && <p className="mt-2 text-xs text-[var(--color-accent-2)]">{msg}</p>}
     </section>
   );
